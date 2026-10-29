@@ -275,6 +275,7 @@ Item {
 
         // Big Bold Digital Time (Optically and mathematically dead-centered)
         Item {
+            id: timeReadoutItem
             Layout.alignment: Qt.AlignHCenter
             implicitWidth: 140
             implicitHeight: timeColon.implicitHeight
@@ -367,13 +368,70 @@ Item {
                 color: Theme.primary
             }
         }
+
+        // Ambient Vibe Engine Line (GreetingEngine)
+        Item {
+            id: vibeWrapper
+            Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: 12
+            implicitWidth: vibeText.implicitWidth + 24
+            implicitHeight: vibeText.implicitHeight + 8
+
+            property real textOpacity: 1.0
+
+            SequentialAnimation {
+                id: shuffleCrossFade
+                NumberAnimation {
+                    target: vibeWrapper
+                    property: "textOpacity"
+                    to: 0.0
+                    duration: 80
+                    easing.type: Easing.OutQuad
+                }
+                ScriptAction {
+                    script: GreetingEngine.shuffle()
+                }
+                NumberAnimation {
+                    target: vibeWrapper
+                    property: "textOpacity"
+                    to: 1.0
+                    duration: 80
+                    easing.type: Easing.InQuad
+                }
+            }
+
+            Text {
+                id: vibeText
+                anchors.centerIn: parent
+                text: GreetingEngine.currentLine
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontPx(11)
+                font.weight: Font.Medium
+                color: Qt.rgba(1, 1, 1, vibeMouse.containsMouse ? 0.88 : 0.55)
+                opacity: vibeWrapper.textOpacity
+
+                Behavior on color {
+                    ColorAnimation { duration: 150 }
+                }
+            }
+
+            MouseArea {
+                id: vibeMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    if (!shuffleCrossFade.running) {
+                        shuffleCrossFade.start()
+                    }
+                }
+            }
+        }
     }
 
     /* Click to toggle 12h / 24h format */
     MouseArea {
-        anchors.centerIn: parent
-        width: 160
-        height: 100
+        anchors.fill: timeReadoutItem
         cursorShape: Qt.PointingHandCursor
         onClicked: {
             root.clockFormat = (root.clockFormat === "24" ? "12" : "24")

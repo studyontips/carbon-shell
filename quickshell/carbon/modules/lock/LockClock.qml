@@ -263,7 +263,7 @@ Item {
         Text {
             id: greetingText
             anchors.right: parent.right
-            text: root.splashStr
+            text: GreetingEngine.currentLine
             font.family: "Caveat"
             font.pixelSize: Theme.fontPx(22)
             font.weight: Font.Bold
