@@ -4,13 +4,14 @@ import "../Singletons"
 
 /**
  * TacticalChronometer:
- * Minimalist aesthetic cyber clock for Carbon // Center Notch.
+ * Variation 02: Quad Compass Rose Harmonic Rosette Clock.
  * Features:
- *   - Only the luminous glowing orb smoothly orbiting around the time
- *   - Soft fading comet arc trail
- *   - Bold modern digital time and uppercase letter-spaced date
- *   - Zero unnecessary circles, reticle rings, or cardinal ticks
- *   - 100% Matugen dynamic theme synchronization
+ *   - 4-Petal Cardinal Rosette orbit with zero-touch text clearance
+ *   - Dual counter-rotating stars (Primary Amber Supernova & Secondary Photon Star)
+ *   - Smooth multi-segment fading comet ribbons
+ *   - Pure floating typography (zero static rails or enclosing circles)
+ *   - Live seconds micro-pill and letter-spaced date
+ *   - 100% dynamic Matugen Theme tokens
  */
 Item {
     id: root
@@ -61,110 +62,160 @@ Item {
         }
     }
 
-    // ── 60 FPS Orbit Rotation Engine ──────────────────────────────────────────
-    property real orbitAngle: 0.0
+    // Dial geometry constants
+    readonly property real centerX: width / 2
+    readonly property real centerY: height / 2
 
-    NumberAnimation on orbitAngle {
-        from: 0.0
-        to: 360.0
-        duration: 60000
-        loops: Animation.Infinite
-        running: true
+    // ── Superellipse Keep-Out Boundary ─────────────────────────────────────────
+    // Guarantees stars and trails never touch or overlap the typography
+    function getTextClearanceRadius(theta) {
+        var w = 98.0
+        var h = 52.0
+        var n = 3.2
+        var cosA = Math.abs(Math.cos(theta))
+        var sinA = Math.abs(Math.sin(theta))
+        var t1 = Math.pow(cosA / w, n)
+        var t2 = Math.pow(sinA / h, n)
+        return Math.pow(t1 + t2, -1.0 / n)
     }
 
-    // Pulse animation for satellite beacon
+    // ── 60 FPS Kinetic Rosette Engine ─────────────────────────────────────────
+    property real animTime: 0.0
+    property real p1X: root.centerX
+    property real p1Y: root.centerY
+    property real p2X: root.centerX
+    property real p2Y: root.centerY
+
     property real beaconPulse: 0.0
     SequentialAnimation on beaconPulse {
         loops: Animation.Infinite
         running: true
-        NumberAnimation { from: 0.0; to: 1.0; duration: 1200; easing.type: Easing.InOutSine }
-        NumberAnimation { from: 1.0; to: 0.0; duration: 1200; easing.type: Easing.InOutSine }
+        NumberAnimation { from: 0.0; to: 1.0; duration: 1400; easing.type: Easing.InOutSine }
+        NumberAnimation { from: 1.0; to: 0.0; duration: 1400; easing.type: Easing.InOutSine }
     }
 
-    // Dial geometry constants
-    readonly property real centerX: width / 2
-    readonly property real centerY: height / 2
-    readonly property real orbitRadius: 82
+    // Trail buffers (longer buffer for sweeping graceful petal ribbons)
+    property var trail1: []
+    property var trail2: []
+    readonly property int maxTrail: 52
 
-    /* ── Subtle Ambient Glow Behind Time ───────────────────────────────────── */
-    Rectangle {
-        anchors.centerIn: parent
-        width: 140
-        height: 140
-        radius: 70
-        color: Theme.primary
-        opacity: 0.05 + (root.beaconPulse * 0.03)
-        Behavior on opacity { NumberAnimation { duration: 250 } }
+    function updateOrbits(dt) {
+        root.animTime += dt
+
+        var t = root.animTime
+        var speed = 1.15
+        var cx = root.centerX
+        var cy = root.centerY
+
+        // Star 1 (Clockwise, Primary Supernova)
+        var th1 = t * speed
+        var rClear1 = root.getTextClearanceRadius(th1)
+        var lobe1 = (1.0 + Math.cos(4.0 * th1)) * 0.5
+        var r1 = rClear1 + 8.0 + lobe1 * 36.0
+        root.p1X = cx + r1 * Math.cos(th1)
+        root.p1Y = cy + r1 * Math.sin(th1)
+
+        // Star 2 (Counter-Clockwise, Secondary Photon Star)
+        var th2 = -t * speed + Math.PI * 0.5
+        var rClear2 = root.getTextClearanceRadius(th2)
+        var lobe2 = (1.0 + Math.cos(4.0 * th2)) * 0.5
+        var r2 = rClear2 + 8.0 + lobe2 * 36.0
+        root.p2X = cx + r2 * Math.cos(th2)
+        root.p2Y = cy + r2 * Math.sin(th2)
+
+        // Update trail 1
+        var t1 = root.trail1
+        t1.push({ x: root.p1X, y: root.p1Y })
+        if (t1.length > root.maxTrail) t1.shift()
+        root.trail1 = t1
+
+        // Update trail 2
+        var t2 = root.trail2
+        t2.push({ x: root.p2X, y: root.p2Y })
+        if (t2.length > root.maxTrail) t2.shift()
+        root.trail2 = t2
     }
 
-    /* ── Canvas Layer: Only the Fading Comet Trail Arc (Zero Circles) ───────── */
+    FrameAnimation {
+        id: frameAnim
+        running: root.visible
+        onTriggered: {
+            root.updateOrbits(frameTime)
+            rosetteCanvas.requestPaint()
+        }
+    }
+
+    /* ── Canvas Layer: Dual Smooth Fading Rosette Comet Ribbons ────────────── */
     Canvas {
-        id: chronoCanvas
+        id: rosetteCanvas
         anchors.fill: parent
         renderTarget: Canvas.FramebufferObject
         renderStrategy: Canvas.Threaded
-
-        Connections {
-            target: root
-            function onOrbitAngleChanged() { chronoCanvas.requestPaint() }
-        }
+        antialiasing: true
 
         onPaint: {
             var ctx = getContext("2d")
             ctx.clearRect(0, 0, width, height)
 
-            var cx = root.centerX
-            var cy = root.centerY
-            var rOrbit = root.orbitRadius
+            // Draw Trail 1 (Primary Amber Gold Flame)
+            var t1 = root.trail1
+            var len1 = t1.length
+            if (len1 > 1) {
+                for (var i = 1; i < len1; i++) {
+                    var progress1 = i / len1
+                    var alpha1 = progress1 * 0.72
+                    ctx.beginPath()
+                    ctx.moveTo(t1[i - 1].x, t1[i - 1].y)
+                    ctx.lineTo(t1[i].x, t1[i].y)
+                    ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, alpha1)
+                    ctx.lineWidth = progress1 * 4.2
+                    ctx.lineCap = "round"
+                    ctx.stroke()
+                }
+            }
 
-            // Smooth fading comet arc trail leading to the orb
-            var headAngleRad = (root.orbitAngle - 90) * Math.PI / 180
-            var trailSpanRad = Math.PI * 0.50 // ~90 degree luminous tail
-            var tailAngleRad = headAngleRad - trailSpanRad
-
-            var x1 = cx + rOrbit * Math.cos(tailAngleRad)
-            var y1 = cy + rOrbit * Math.sin(tailAngleRad)
-            var x2 = cx + rOrbit * Math.cos(headAngleRad)
-            var y2 = cy + rOrbit * Math.sin(headAngleRad)
-
-            var trailGrad = ctx.createLinearGradient(x1, y1, x2, y2)
-            trailGrad.addColorStop(0.0, "transparent")
-            trailGrad.addColorStop(0.6, Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.30))
-            trailGrad.addColorStop(1.0, Theme.primary)
-
-            ctx.beginPath()
-            ctx.arc(cx, cy, rOrbit, tailAngleRad, headAngleRad)
-            ctx.strokeStyle = trailGrad
-            ctx.lineWidth = 2.5
-            ctx.lineCap = "round"
-            ctx.stroke()
+            // Draw Trail 2 (Secondary Photon Star Ribbon)
+            var t2 = root.trail2
+            var len2 = t2.length
+            if (len2 > 1) {
+                for (var j = 1; j < len2; j++) {
+                    var progress2 = j / len2
+                    var alpha2 = progress2 * 0.58
+                    ctx.beginPath()
+                    ctx.moveTo(t2[j - 1].x, t2[j - 1].y)
+                    ctx.lineTo(t2[j].x, t2[j].y)
+                    ctx.strokeStyle = Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, alpha2)
+                    ctx.lineWidth = progress2 * 2.8
+                    ctx.lineCap = "round"
+                    ctx.stroke()
+                }
+            }
         }
     }
 
-    /* ── Glowing Orb Node (Revolving Orbit) ─────────────────────────────────── */
+    /* ── Star 1: Primary Amber Supernova Orb ───────────────────────────────── */
     Item {
-        id: satelliteNode
-        readonly property real rad: (root.orbitAngle - 90) * Math.PI / 180
-        x: root.centerX + root.orbitRadius * Math.cos(rad) - width / 2
-        y: root.centerY + root.orbitRadius * Math.sin(rad) - height / 2
+        id: star1Node
+        x: root.p1X - width / 2
+        y: root.p1Y - height / 2
         width: 16
         height: 16
 
         // Pulsing Soft Glow Halo
         Rectangle {
             anchors.centerIn: parent
-            width: 22 + root.beaconPulse * 8
+            width: 22 + root.beaconPulse * 6
             height: width
             radius: width / 2
             color: Theme.primary
-            opacity: 0.38 - root.beaconPulse * 0.20
+            opacity: 0.35 - root.beaconPulse * 0.18
         }
 
         // Outer Accent Ring
         Rectangle {
             anchors.fill: parent
             radius: width / 2
-            color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.90)
+            color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.88)
             border.color: Theme.primary
             border.width: 1.5
 
@@ -179,40 +230,154 @@ Item {
         }
     }
 
-    /* ── Center Digital Time & Date ─────────────────────────────────────────── */
-    ColumnLayout {
-        anchors.centerIn: parent
-        spacing: 2
-        z: 10
+    /* ── Star 2: Secondary Photon Star ─────────────────────────────────────── */
+    Item {
+        id: star2Node
+        x: root.p2X - width / 2
+        y: root.p2Y - height / 2
+        width: 12
+        height: 12
 
-        Text {
-            Layout.alignment: Qt.AlignHCenter
-            text: root.hourStr + ":" + root.minStr
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontPx(36)
-            font.weight: Font.Bold
+        // Outer Soft Halo
+        Rectangle {
+            anchors.centerIn: parent
+            width: 16
+            height: 16
+            radius: 8
             color: Theme.fg
-            horizontalAlignment: Text.AlignHCenter
+            opacity: 0.22
         }
 
-        Text {
+        // Outer Ring
+        Rectangle {
+            anchors.fill: parent
+            radius: width / 2
+            color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.90)
+            border.color: Theme.fg
+            border.width: 1.2
+
+            // Inner Crisp Photon Core
+            Rectangle {
+                anchors.centerIn: parent
+                width: 4
+                height: 4
+                radius: 2
+                color: Theme.fg
+            }
+        }
+    }
+
+    /* ── Center Digital Time & Date (Pure Minimalist Floating Typography) ──── */
+    ColumnLayout {
+        anchors.centerIn: parent
+        spacing: 3
+        z: 10
+
+        // Subtle Top Status Tag
+        RowLayout {
             Layout.alignment: Qt.AlignHCenter
+            spacing: 5
+
+            Rectangle {
+                width: 5
+                height: 5
+                radius: 2.5
+                color: Theme.primary
+                opacity: 0.6 + root.beaconPulse * 0.4
+            }
+
+            Text {
+                text: "QUAD COMPASS ROSE"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontPx(8)
+                font.weight: Font.Bold
+                font.letterSpacing: 1.8
+                color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.85)
+            }
+        }
+
+        // Big Bold Digital Time
+        RowLayout {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: 2
+
+            Text {
+                text: root.hourStr
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontPx(44)
+                font.weight: Font.Black
+                color: Theme.fg
+                horizontalAlignment: Text.AlignRight
+            }
+
+            Text {
+                text: ":"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontPx(44)
+                font.weight: Font.Light
+                color: Theme.primary
+                opacity: 0.7 + root.beaconPulse * 0.3
+            }
+
+            Text {
+                text: root.minStr
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontPx(44)
+                font.weight: Font.Black
+                color: Theme.fg
+                horizontalAlignment: Text.AlignLeft
+            }
+        }
+
+        // Floating Date & Seconds Indicator
+        RowLayout {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: 6
             visible: root.showDate
-            text: root.dateStr
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontPx(10)
-            font.weight: Font.Bold
-            font.letterSpacing: 1.6
-            color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.65)
-            horizontalAlignment: Text.AlignHCenter
+
+            Text {
+                text: root.dateStr
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontPx(10)
+                font.weight: Font.Bold
+                font.letterSpacing: 1.5
+                color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.65)
+            }
+
+            Rectangle {
+                width: 3
+                height: 3
+                radius: 1.5
+                color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.60)
+            }
+
+            // Micro Seconds Badge
+            Rectangle {
+                implicitWidth: secText.implicitWidth + 10
+                implicitHeight: 18
+                radius: 9
+                color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.12)
+                border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.28)
+                border.width: 1
+
+                Text {
+                    id: secText
+                    anchors.centerIn: parent
+                    text: root.secStr + "s"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontPx(10)
+                    font.weight: Font.Bold
+                    color: Theme.primary
+                }
+            }
         }
     }
 
     /* Click to toggle 12h / 24h format */
     MouseArea {
         anchors.centerIn: parent
-        width: 130
-        height: 130
+        width: 160
+        height: 100
         cursorShape: Qt.PointingHandCursor
         onClicked: {
             root.clockFormat = (root.clockFormat === "24" ? "12" : "24")
