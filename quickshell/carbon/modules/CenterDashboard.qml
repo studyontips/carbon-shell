@@ -137,7 +137,7 @@ Item {
             /* ============================================================= */
             Item {
                 id: timelineCol
-                Layout.preferredWidth: 246
+                Layout.preferredWidth: 240
                 Layout.fillHeight: true
                 clip: true
 
@@ -159,7 +159,7 @@ Item {
             Item {
                 id: centerCol
                 Layout.fillWidth: true
-                Layout.preferredWidth: 320
+                Layout.preferredWidth: 288
                 Layout.fillHeight: true
                 clip: true
 
@@ -178,11 +178,11 @@ Item {
             }
 
             /* ============================================================= */
-            /* 3. RIGHT COLUMN: LRC // SYNC (SYNCHRONIZED LYRICS & MPRIS)    */
+            /* 3. RIGHT COLUMN: MEDIA PLAYER & LYRICS STREAM                 */
             /* ============================================================= */
             Item {
                 id: rightCol
-                Layout.preferredWidth: 236
+                Layout.preferredWidth: 240
                 Layout.fillHeight: true
 
                 property string viewMode: "lyrics"
@@ -191,38 +191,15 @@ Item {
                     anchors.fill: parent
                     spacing: 8
 
-                    // Header: LRC // SYNC, Track Title & Rounded Album Art
+                    // Header: Clean Track Title, Artist & Album Art (Zero "LRC // SYNC" clutter)
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 8
 
-                        // Left: Glowing dot + LRC // SYNC
-                        RowLayout {
-                            spacing: 5
-
-                            Rectangle {
-                                width: 6
-                                height: 6
-                                radius: 3
-                                color: LyricsService.hasLyrics ? Theme.primary : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.25)
-                            }
-
-                            Text {
-                                text: LyricsService.hasLyrics ? "LRC // SYNC" : (LyricsService.hasTrack ? "NO LYRICS" : "STANDBY")
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontPx(9)
-                                font.weight: Font.Bold
-                                font.letterSpacing: 1.2
-                                color: LyricsService.hasLyrics ? Theme.accent : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.40)
-                            }
-                        }
-
-                        Item { Layout.fillWidth: true }
-
-                        // Track Title & Subtext
+                        // Track Title & Artist (Clean left aligned)
                         ColumnLayout {
-                            Layout.maximumWidth: 100
-                            spacing: 0
+                            Layout.fillWidth: true
+                            spacing: 1
 
                             Text {
                                 Layout.fillWidth: true
@@ -232,18 +209,16 @@ Item {
                                 font.weight: Font.Bold
                                 color: Theme.fg
                                 elide: Text.ElideRight
-                                horizontalAlignment: Text.AlignRight
                             }
 
                             Text {
                                 Layout.fillWidth: true
                                 text: LyricsService.hasTrack ? (LyricsService.trackArtist || "Unknown Artist") : "Standby"
                                 font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontPx(8)
+                                font.pixelSize: Theme.fontPx(8.5)
                                 font.weight: Font.Medium
                                 color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.50)
                                 elide: Text.ElideRight
-                                horizontalAlignment: Text.AlignRight
                             }
                         }
 
@@ -266,11 +241,11 @@ Item {
 
                             Text {
                                 anchors.centerIn: parent
+                                visible: !LyricsService.hasTrack || !LyricsService.artUrl || LyricsService.artUrl.length === 0
                                 text: "music_note"
                                 font.family: Theme.fontIcon
                                 font.pixelSize: 14
-                                color: Theme.accent
-                                visible: !LyricsService.hasTrack || LyricsService.artUrl.length === 0 || !LyricsService.artUrl
+                                color: Theme.primary
                             }
                         }
                     }

@@ -270,62 +270,48 @@ Item {
     /* ── Center Digital Time & Date (Pure Minimalist Floating Typography) ──── */
     ColumnLayout {
         anchors.centerIn: parent
-        spacing: 3
+        spacing: 4
         z: 10
 
-        // Subtle Top Status Tag
-        RowLayout {
+        // Big Bold Digital Time (Optically and mathematically dead-centered)
+        Item {
             Layout.alignment: Qt.AlignHCenter
-            spacing: 5
-
-            Rectangle {
-                width: 4
-                height: 4
-                radius: 2
-                color: Theme.primary
-                opacity: 0.6 + root.beaconPulse * 0.4
-            }
+            implicitWidth: 140
+            implicitHeight: timeColon.implicitHeight
 
             Text {
-                text: "QUAD COMPASS ROSE"
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontPx(7.5)
-                font.weight: Font.Bold
-                font.letterSpacing: 1.6
-                color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.85)
-            }
-        }
-
-        // Big Bold Digital Time
-        RowLayout {
-            Layout.alignment: Qt.AlignHCenter
-            spacing: 2
-
-            Text {
-                text: root.hourStr
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontPx(36)
-                font.weight: Font.Black
-                color: Theme.fg
-                horizontalAlignment: Text.AlignRight
-            }
-
-            Text {
+                id: timeColon
+                anchors.centerIn: parent
                 text: ":"
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontPx(36)
+                font.pixelSize: Theme.fontPx(38)
                 font.weight: Font.Light
                 color: Theme.primary
                 opacity: 0.7 + root.beaconPulse * 0.3
             }
 
             Text {
-                text: root.minStr
+                id: hourText
+                anchors.right: timeColon.left
+                anchors.rightMargin: 1
+                anchors.verticalCenter: timeColon.verticalCenter
+                text: root.hourStr
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontPx(36)
+                font.pixelSize: Theme.fontPx(38)
                 font.weight: Font.Black
                 color: Theme.fg
-                horizontalAlignment: Text.AlignLeft
+            }
+
+            Text {
+                id: minText
+                anchors.left: timeColon.right
+                anchors.leftMargin: 1
+                anchors.verticalCenter: timeColon.verticalCenter
+                text: root.minStr
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontPx(38)
+                font.weight: Font.Black
+                color: Theme.fg
             }
         }
 
