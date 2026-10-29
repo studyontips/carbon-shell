@@ -3151,7 +3151,7 @@ ShellRoot {
                 id: notchCenterItem
                 z: root.centerDashboardOpen ? 100 : 1
                 notchOpacity: root.notchOpacity
-                filletRadius: root.centerDashboardOpen ? 16 : root.notchEarRadius
+                filletRadius: root.notchEarRadius
                 bottomRadius: root.centerDashboardOpen ? 20 : root.notchBottomRadius
                 isExpanded: root.centerDashboardOpen
                 visible: root.musicBarEdge === root.mainBarEdge
