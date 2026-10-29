@@ -33,6 +33,8 @@ Item {
     width: implicitWidth
     height: implicitHeight
     clip: false
+    property real earRadius: 16
+    property real bottomRadius: 20
 
     focus: root.open
     Keys.enabled: root.open
@@ -100,7 +102,7 @@ Item {
             z: 0
         }
 
-        // Top-attached seamless background with flat top edge and curved bottom corners
+        // Top-attached seamless background with notch ear fillets and curved bottom corners
         Shape {
             id: cardBgShape
             anchors.fill: parent
@@ -110,16 +112,42 @@ Item {
             visible: true
 
             ShapePath {
-                fillColor: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, root.showBackground ? Theme.shellOpacity : 0.98)
+                fillColor: Theme.isDark ? Qt.rgba(0.04, 0.04, 0.06, root.showBackground ? Theme.shellOpacity : 0.98) : Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, root.showBackground ? Theme.shellOpacity : 0.98)
                 strokeColor: "transparent"
                 strokeWidth: 0
                 startX: 0; startY: 0
                 PathLine { x: mainCard.width; y: 0 }
-                PathLine { x: mainCard.width; y: mainCard.height - 20 }
-                PathArc { x: mainCard.width - 20; y: mainCard.height; radiusX: 20; radiusY: 20 }
-                PathLine { x: 20; y: mainCard.height }
-                PathArc { x: 0; y: mainCard.height - 20; radiusX: 20; radiusY: 20 }
-                PathLine { x: 0; y: 0 }
+                PathArc {
+                    x: mainCard.width - root.earRadius
+                    y: root.earRadius
+                    radiusX: root.earRadius
+                    radiusY: root.earRadius
+                    direction: PathArc.Clockwise
+                }
+                PathLine { x: mainCard.width - root.earRadius; y: mainCard.height - root.bottomRadius }
+                PathArc {
+                    x: mainCard.width - root.earRadius - root.bottomRadius
+                    y: mainCard.height
+                    radiusX: root.bottomRadius
+                    radiusY: root.bottomRadius
+                    direction: PathArc.Counterclockwise
+                }
+                PathLine { x: root.earRadius + root.bottomRadius; y: mainCard.height }
+                PathArc {
+                    x: root.earRadius
+                    y: mainCard.height - root.bottomRadius
+                    radiusX: root.bottomRadius
+                    radiusY: root.bottomRadius
+                    direction: PathArc.Counterclockwise
+                }
+                PathLine { x: root.earRadius; y: root.earRadius }
+                PathArc {
+                    x: 0
+                    y: 0
+                    radiusX: root.earRadius
+                    radiusY: root.earRadius
+                    direction: PathArc.Clockwise
+                }
             }
         }
 

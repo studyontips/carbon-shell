@@ -342,6 +342,8 @@ NotchContainer {
         anchors.horizontalCenter: parent.horizontalCenter
         width: 820
         height: 270
+        earRadius: root.filletRadius > 0 ? root.filletRadius : 16
+        bottomRadius: root.bottomRadius
         showBackground: true
         open: root.isExpanded
         visible: opacity > 0.01
