@@ -315,46 +315,56 @@ Item {
             }
         }
 
-        // Floating Date & Seconds Indicator
+        // Symmetrically Balanced Date & Seconds (Optically and mathematically dead-centered)
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
-            spacing: 5
+            spacing: 6
             visible: root.showDate
 
+            // Left Balancer: Year
             Text {
-                text: root.dateStr
+                text: root.currentDate.getFullYear()
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontPx(9.5)
+                font.pixelSize: Theme.fontPx(8.5)
                 font.weight: Font.Bold
-                font.letterSpacing: 1.4
-                color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.65)
+                font.letterSpacing: 0.8
+                color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.40)
             }
 
             Rectangle {
                 width: 3
                 height: 3
                 radius: 1.5
-                color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.60)
+                color: Theme.primary
+                opacity: 0.50
             }
 
-            // Micro Seconds Badge
-            Rectangle {
-                implicitWidth: secText.implicitWidth + 8
-                implicitHeight: 16
-                radius: 8
-                color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.12)
-                border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.28)
-                border.width: 1
+            // Center: Date (THU 29 OCT) - Dead-centered directly under colon
+            Text {
+                text: root.dateStr
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontPx(9.5)
+                font.weight: Font.Bold
+                font.letterSpacing: 1.4
+                color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.75)
+            }
 
-                Text {
-                    id: secText
-                    anchors.centerIn: parent
-                    text: root.secStr + "s"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontPx(9.5)
-                    font.weight: Font.Bold
-                    color: Theme.primary
-                }
+            Rectangle {
+                width: 3
+                height: 3
+                radius: 1.5
+                color: Theme.primary
+                opacity: 0.50
+            }
+
+            // Right Balancer: Seconds
+            Text {
+                text: root.secStr + "s"
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontPx(8.5)
+                font.weight: Font.Bold
+                font.letterSpacing: 0.8
+                color: Theme.primary
             }
         }
     }
