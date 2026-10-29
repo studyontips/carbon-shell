@@ -164,21 +164,8 @@ def is_mismatched_lyrics(lines, title, artist):
             header_parts = txt.split(" - ")
             head_song = header_parts[0].strip().lower()
             head_words = set(w for w in re.findall(r"\b[a-zA-Z0-9]{3,}\b", head_song) if w not in stop_words)
-            if head_words:
-                missing_from_head = title_words - head_words
-                extra_in_head = head_words - title_words
-                if missing_from_head and extra_in_head:
-                    return True
-
-    # Check full lyrics text: at least half of the distinctive title words must appear,
-    # and the primary (first) distinctive title word must be present.
-    full_text = " ".join(l.get("text", "") for l in lines).lower()
-    matched = {w for w in title_words if w in full_text}
-    if len(matched) < len(title_words) / 2.0:
-        return True
-    first_title_words = [w for w in re.findall(r"\b[a-zA-Z0-9\u0900-\u097f\u0a00-\u0a7f]{3,}\b", clean_t) if w not in stop_words]
-    if first_title_words and first_title_words[0] not in full_text:
-        return True
+            if head_words and len(head_words.intersection(title_words)) == 0 and len(head_words) >= 2:
+                return True
     return False
 
 def extract_video_id(track_id):

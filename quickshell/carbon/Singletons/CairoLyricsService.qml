@@ -23,7 +23,7 @@ Singleton {
     readonly property string trackTitle: activePlayer ? (activePlayer.trackTitle || "") : ""
     readonly property string trackArtist: activePlayer ? (activePlayer.trackArtist || "") : ""
     readonly property string trackAlbum: activePlayer && activePlayer.metadata ? (activePlayer.metadata["xesam:album"] || "") : ""
-    readonly property string trackId: activePlayer && activePlayer.metadata ? (activePlayer.metadata["mpris:trackid"] || "") : ""
+    readonly property string trackId: activePlayer && activePlayer.metadata && activePlayer.metadata["mpris:trackid"] ? String(activePlayer.metadata["mpris:trackid"]) : ""
     readonly property string artUrl: activePlayer ? (activePlayer.trackArtUrl || "") : ""
     readonly property bool isPlaying: activePlayer && activePlayer.playbackState === MprisPlaybackState.Playing
     readonly property bool hasTrack: trackTitle.trim().length > 0
@@ -117,13 +117,11 @@ Singleton {
 
     Process {
         id: lyricsProc
-        property string buffer: ""
         property string requestedKey: ""
 
-        stdout: SplitParser {
-            onRead: (line) => {
-                lyricsProc.buffer += line + "\n"
-            }
+        stdout: StdioCollector {
+            id: cairoStdio
+            waitForEnd: true
         }
         stderr: SplitParser {
             onRead: (line) => {
@@ -131,30 +129,27 @@ Singleton {
             }
         }
 
-        onRunningChanged: {
-            if (running) {
-                buffer = ""
-            } else {
-                if (requestedKey !== root.lastFetchedKey) {
-                    console.log("[CairoLyricsService] Ignoring stale lyrics for:", requestedKey, "current:", root.lastFetchedKey)
-                    return
-                }
-                if (buffer.trim().length > 0) {
-                    try {
-                        const res = JSON.parse(buffer)
-                        if (res && res.found && Array.isArray(res.lines) && res.lines.length > 0) {
-                            root.lines = res.lines
-                            console.log("[CairoLyricsService] Loaded " + root.lines.length + " kinetic lyric lines for Cairo:", root.trackTitle, "(romanize=" + LockState.cairoRomanizeLyrics + ")")
-                        } else {
-                            root.lines = []
-                        }
-                    } catch (e) {
-                        console.log("[CairoLyricsService] Error parsing lyrics JSON:", e)
+        onExited: function(code) {
+            if (requestedKey !== root.lastFetchedKey) {
+                console.log("[CairoLyricsService] Ignoring stale lyrics for:", requestedKey, "current:", root.lastFetchedKey)
+                return
+            }
+            var out = (cairoStdio.text || "").trim()
+            if (code === 0 && out.length > 0) {
+                try {
+                    const res = JSON.parse(out)
+                    if (res && res.found && Array.isArray(res.lines) && res.lines.length > 0) {
+                        root.lines = res.lines
+                        console.log("[CairoLyricsService] Loaded " + root.lines.length + " kinetic lyric lines for Cairo:", root.trackTitle, "(romanize=" + LockState.cairoRomanizeLyrics + ")")
+                    } else {
                         root.lines = []
                     }
-                } else {
+                } catch (e) {
+                    console.log("[CairoLyricsService] Error parsing lyrics JSON:", e)
                     root.lines = []
                 }
+            } else {
+                root.lines = []
             }
         }
     }

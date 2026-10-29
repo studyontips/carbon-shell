@@ -88,7 +88,7 @@ Singleton {
     readonly property string trackTitle: activePlayer ? (activePlayer.trackTitle || "") : ""
     readonly property string trackArtist: activePlayer ? (activePlayer.trackArtist || "") : ""
     readonly property string trackAlbum: activePlayer && activePlayer.metadata ? (activePlayer.metadata["xesam:album"] || "") : ""
-    readonly property string trackId: activePlayer && activePlayer.metadata ? (activePlayer.metadata["mpris:trackid"] || "") : ""
+    readonly property string trackId: activePlayer && activePlayer.metadata && activePlayer.metadata["mpris:trackid"] ? String(activePlayer.metadata["mpris:trackid"]) : ""
     readonly property string artUrl: activePlayer ? (activePlayer.trackArtUrl || "") : ""
     readonly property bool isPlaying: activePlayer && activePlayer.playbackState === MprisPlaybackState.Playing
     readonly property bool hasTrack: trackTitle.trim().length > 0
@@ -151,6 +151,7 @@ Singleton {
 
     onTrackTitleChanged: {
         if (root.enabled) {
+            root.lastFetchedKey = ""
             if (lyricsProc.running) lyricsProc.running = false
             root.lines = []
             root.currentLine = ""
@@ -161,6 +162,7 @@ Singleton {
     }
     onTrackArtistChanged: {
         if (root.enabled) {
+            root.lastFetchedKey = ""
             if (lyricsProc.running) lyricsProc.running = false
             root.lines = []
             root.currentLine = ""
@@ -170,18 +172,20 @@ Singleton {
         }
     }
     onTotalLengthChanged: {
-        if (root.enabled && root.totalLength > 10 && !root.hasLyrics && !lyricsProc.running) {
-            var p = root.activePlayer
-            var title = p ? (p.trackTitle || "") : root.trackTitle
-            var artist = p ? (p.trackArtist || "") : root.trackArtist
-            var key = title + "::" + artist
-            if (root.lastFetchedKey !== key) {
-                root.fetchLyrics()
-            }
+        if (root.enabled && root.totalLength > 5 && (!root.lines || root.lines.length === 0) && !lyricsProc.running) {
+            root.lastFetchedKey = ""
+            root.fetchLyrics()
         }
     }
     onCurrentPositionChanged: updateSync()
     onIsPlayingChanged: updateSync()
+
+    function reloadLyrics() {
+        root.lastFetchedKey = ""
+        root.lines = []
+        if (lyricsProc.running) lyricsProc.running = false
+        root.fetchLyrics()
+    }
 
     function fetchLyrics() {
         var p = root.activePlayer
@@ -231,13 +235,11 @@ Singleton {
 
     Process {
         id: lyricsProc
-        property string buffer: ""
         property string requestedKey: ""
 
-        stdout: SplitParser {
-            onRead: (line) => {
-                lyricsProc.buffer += line + "\n"
-            }
+        stdout: StdioCollector {
+            id: lyricsStdio
+            waitForEnd: true
         }
         stderr: SplitParser {
             onRead: (line) => {
@@ -245,30 +247,27 @@ Singleton {
             }
         }
 
-        onRunningChanged: {
-            if (running) {
-                buffer = ""
-            } else {
-                if (requestedKey !== root.lastFetchedKey) {
-                    return
-                }
-                if (buffer.trim().length > 0) {
-                    try {
-                        const res = JSON.parse(buffer)
-                        if (res && res.found && Array.isArray(res.lines) && res.lines.length > 0) {
-                            root.lines = res.lines
-                            root.updateSync()
-                            console.log("[LyricsService] Loaded " + root.lines.length + " synced lyric lines for:", root.trackTitle)
-                        } else {
-                            root.lines = []
-                        }
-                    } catch (e) {
-                        console.log("[LyricsService] Error parsing lyrics JSON:", e)
+        onExited: function(code) {
+            if (requestedKey !== root.lastFetchedKey) {
+                return
+            }
+            var out = (lyricsStdio.text || "").trim()
+            if (code === 0 && out.length > 0) {
+                try {
+                    const res = JSON.parse(out)
+                    if (res && res.found && Array.isArray(res.lines) && res.lines.length > 0) {
+                        root.lines = res.lines
+                        root.updateSync()
+                        console.log("[LyricsService] Loaded " + root.lines.length + " synced lyric lines for:", root.trackTitle)
+                    } else {
                         root.lines = []
                     }
-                } else {
+                } catch (e) {
+                    console.log("[LyricsService] Error parsing lyrics JSON:", e)
                     root.lines = []
                 }
+            } else {
+                root.lines = []
             }
         }
     }

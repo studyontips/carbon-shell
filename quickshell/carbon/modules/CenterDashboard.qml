@@ -58,6 +58,14 @@ Item {
     property int selectedDay: (new Date()).getDate()
     property bool eventFormMode: false
 
+    onOpenChanged: {
+        if (root.open) {
+            if (LyricsService.hasTrack && (!LyricsService.lines || LyricsService.lines.length === 0)) {
+                LyricsService.reloadLyrics()
+            }
+        }
+    }
+
     function openCalendarMode() {
         root.calendarViewMode = "timeline"
     }
@@ -107,18 +115,6 @@ Item {
                 strokeWidth: 0
                 startX: 0; startY: 0
                 PathLine { x: mainCard.width; y: 0 }
-                PathLine { x: mainCard.width; y: mainCard.height - 20 }
-                PathArc { x: mainCard.width - 20; y: mainCard.height; radiusX: 20; radiusY: 20 }
-                PathLine { x: 20; y: mainCard.height }
-                PathArc { x: 0; y: mainCard.height - 20; radiusX: 20; radiusY: 20 }
-                PathLine { x: 0; y: 0 }
-            }
-
-            ShapePath {
-                fillColor: "transparent"
-                strokeColor: root.open ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35) : Theme.outline
-                strokeWidth: 1
-                startX: mainCard.width; startY: 0
                 PathLine { x: mainCard.width; y: mainCard.height - 20 }
                 PathArc { x: mainCard.width - 20; y: mainCard.height; radiusX: 20; radiusY: 20 }
                 PathLine { x: 20; y: mainCard.height }
@@ -430,16 +426,16 @@ Item {
                                 width: 6
                                 height: 6
                                 radius: 3
-                                color: LyricsService.hasLyrics ? Theme.primary : Theme.accent
+                                color: LyricsService.hasLyrics ? Theme.primary : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.25)
                             }
 
                             Text {
-                                text: "LRC // SYNC"
+                                text: LyricsService.hasLyrics ? "LRC // SYNC" : (LyricsService.hasTrack ? "NO LYRICS" : "STANDBY")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontPx(9)
                                 font.weight: Font.Bold
                                 font.letterSpacing: 1.2
-                                color: Theme.accent
+                                color: LyricsService.hasLyrics ? Theme.accent : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.40)
                             }
                         }
 
