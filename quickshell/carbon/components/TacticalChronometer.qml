@@ -314,6 +314,15 @@ Item {
                 font.weight: Font.Black
                 color: Theme.fg
             }
+
+            /* Click to toggle 12h / 24h format */
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    root.clockFormat = (root.clockFormat === "24" ? "12" : "24")
+                }
+            }
         }
 
         // Symmetrically Balanced Date & Seconds (Optically and mathematically dead-centered)
@@ -426,15 +435,6 @@ Item {
                     }
                 }
             }
-        }
-    }
-
-    /* Click to toggle 12h / 24h format */
-    MouseArea {
-        anchors.fill: timeReadoutItem
-        cursorShape: Qt.PointingHandCursor
-        onClicked: {
-            root.clockFormat = (root.clockFormat === "24" ? "12" : "24")
         }
     }
 }

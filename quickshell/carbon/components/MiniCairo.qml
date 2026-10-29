@@ -9,6 +9,7 @@ import "../Singletons"
  * Compact, ultra-low-overhead Kinetic Lyric Engine for Carbon // Center Notch Dropdown.
  *
  * Implements:
+ *   - Unified Second-Based Timeline (matching MPRIS and LRCLIB native second units).
  *   - 60fps Interpolated Audio Clock (active ONLY when pavilion is open & media is playing).
  *   - Kinetic 3-Slot Vertical Barrel (Previous Word, Active Word, Next Incoming Word).
  *   - Signature Cairo Translucent Glass Tape Highlight with Matugen primary aura.
@@ -22,6 +23,8 @@ Item {
 
     readonly property bool hasTrack: LyricsService.hasTrack
     readonly property bool isPlaying: LyricsService.isPlaying
+    readonly property real currentPosition: LyricsService.currentPosition
+
     readonly property var rawLines: (CairoLyricsService.lines && CairoLyricsService.lines.length > 0)
                                     ? CairoLyricsService.lines
                                     : LyricsService.lines
@@ -30,29 +33,27 @@ Item {
     property var tokens: []
     property int currentTokenIndex: -1
 
-    // ── 1. 60 FPS Interpolated Wall-Clock Audio Engine ────────────────────────
-    property double songEpochMs: 0
-    property real livePositionMs: 0
+    // ── 1. 60 FPS Interpolated Wall-Clock Audio Engine (Seconds Based) ────────
+    property double lastUpdateMs: Date.now()
+    property real basePosSec: 0
 
-    function syncBaseTime() {
-        var player = LyricsService.activePlayer
-        var rawPos = player ? player.position : 0
-        var posMs = (rawPos > 1000000) ? (rawPos / 1000) : (rawPos < 36000 ? rawPos * 1000 : rawPos)
-        if (isNaN(posMs) || posMs < 0) posMs = 0
-        root.songEpochMs = Date.now() - posMs
-        root.livePositionMs = posMs
-        root.updateTokenIndex()
+    onCurrentPositionChanged: {
+        root.lastUpdateMs = Date.now()
+        root.basePosSec = root.currentPosition
+        root.updateWithPosition(root.basePosSec)
     }
 
     onIsPlayingChanged: {
-        if (root.isPlaying) {
-            root.syncBaseTime()
-        }
+        root.lastUpdateMs = Date.now()
+        root.basePosSec = root.currentPosition
+        root.updateWithPosition(root.basePosSec)
     }
 
     onActiveChanged: {
-        if (root.active && root.isPlaying) {
-            root.syncBaseTime()
+        if (root.active) {
+            root.lastUpdateMs = Date.now()
+            root.basePosSec = root.currentPosition
+            root.updateWithPosition(root.basePosSec)
         }
     }
 
@@ -62,10 +63,11 @@ Item {
         repeat: true
         running: root.active && root.isPlaying && root.hasLyrics
         onTriggered: {
-            if (root.songEpochMs > 0 && root.isPlaying) {
-                root.livePositionMs = Math.max(0, Date.now() - root.songEpochMs)
+            if (root.isPlaying) {
+                var elapsedSec = (Date.now() - root.lastUpdateMs) / 1000.0
+                var estPos = root.basePosSec + elapsedSec
+                root.updateWithPosition(estPos)
             }
-            root.updateTokenIndex()
         }
     }
 
@@ -84,21 +86,26 @@ Item {
         var result = []
         for (var l = 0; l < srcLines.length; l++) {
             var line = srcLines[l]
-            var lineStart = line.time || 0
-            var nextLineStart = (l + 1 < srcLines.length && srcLines[l + 1].time) ? srcLines[l + 1].time : (lineStart + 4200)
-            var lineDuration = Math.max(800, nextLineStart - lineStart)
+            var lineStart = Number(line.time) || 0.0
+            var nextLineStart = (l + 1 < srcLines.length && srcLines[l + 1].time !== undefined)
+                                ? Number(srcLines[l + 1].time)
+                                : (lineStart + 4.0)
+            var lineDuration = Math.max(0.8, nextLineStart - lineStart)
 
-            if (line.words && line.words.length > 0) {
+            if (line.words && Array.isArray(line.words) && line.words.length > 0) {
                 for (var w = 0; w < line.words.length; w++) {
                     var wd = line.words[w]
-                    var wStart = (wd.time !== undefined) ? wd.time : lineStart
+                    var wStart = (wd.time !== undefined) ? Number(wd.time) : lineStart
+                    var wDur = (wd.dur !== undefined)
+                               ? Number(wd.dur)
+                               : (wd.duration ? (Number(wd.duration) / 1000.0) : 0.32)
                     var wEnd = (w + 1 < line.words.length && line.words[w + 1].time !== undefined)
-                               ? line.words[w + 1].time
-                               : (wStart + (wd.duration || 320))
+                               ? Number(line.words[w + 1].time)
+                               : (wStart + Math.max(0.10, wDur))
                     result.push({
                         text: (wd.text || "").trim(),
-                        startMs: wStart,
-                        endMs: Math.max(wStart + 100, wEnd)
+                        start: wStart,
+                        end: Math.max(wStart + 0.08, wEnd)
                     })
                 }
             } else {
@@ -119,53 +126,61 @@ Item {
                     }
                 }
 
-                var activeWindow = Math.min(lineDuration * 0.90, chunks.length * 480)
+                var activeWindow = Math.min(lineDuration * 0.90, chunks.length * 0.48)
                 var chunkDuration = activeWindow / chunks.length
                 for (var c = 0; c < chunks.length; c++) {
                     var cStart = lineStart + (c * chunkDuration)
                     var cEnd = cStart + chunkDuration
                     result.push({
                         text: chunks[c],
-                        startMs: cStart,
-                        endMs: cEnd
+                        start: cStart,
+                        end: cEnd
                     })
                 }
             }
         }
 
         root.tokens = result
-        root.syncBaseTime()
+        root.lastUpdateMs = Date.now()
+        root.basePosSec = root.currentPosition
+        root.updateWithPosition(root.basePosSec)
     }
 
-    function updateTokenIndex() {
+    function updateWithPosition(pos) {
         var toks = root.tokens
         if (!toks || toks.length === 0) {
             root.currentTokenIndex = -1
             return
         }
 
-        var pos = root.livePositionMs
-        var cur = root.currentTokenIndex
+        // Add 0.12s visual lookahead for responsive lead
+        var p = pos + 0.12
 
+        if (p < toks[0].start) {
+            root.currentTokenIndex = -1
+            return
+        }
+
+        var cur = root.currentTokenIndex
         if (cur >= 0 && cur < toks.length) {
-            if (pos >= toks[cur].startMs && pos < toks[cur].endMs) {
+            if (p >= toks[cur].start && p < toks[cur].end) {
                 return
             }
         }
 
         var found = -1
         for (var i = 0; i < toks.length; i++) {
-            if (pos >= toks[i].startMs && pos < toks[i].endMs) {
+            if (p >= toks[i].start && p < toks[i].end) {
                 found = i
                 break
             }
-            if (pos < toks[i].startMs) {
+            if (p < toks[i].start) {
                 found = Math.max(0, i - 1)
                 break
             }
         }
         if (found === -1 && toks.length > 0) {
-            if (pos >= toks[toks.length - 1].endMs) {
+            if (p >= toks[toks.length - 1].end) {
                 found = toks.length - 1
             } else {
                 found = 0
@@ -178,10 +193,12 @@ Item {
 
     Component.onCompleted: {
         rebuildTokens()
-        syncBaseTime()
+        root.lastUpdateMs = Date.now()
+        root.basePosSec = root.currentPosition
+        root.updateWithPosition(root.basePosSec)
     }
 
-    // ── 3. Empty State (Strictly preserves the user's favorite notice) ─────────
+    // ── 3. Empty State (Strictly preserves user's favorite notice) ───────────
     Item {
         anchors.fill: parent
         visible: !root.hasLyrics
@@ -222,8 +239,10 @@ Item {
         readonly property int idx: root.currentTokenIndex
 
         readonly property string prevText: (idx > 0 && idx - 1 < toks.length) ? toks[idx - 1].text : ""
-        readonly property string curText: (idx >= 0 && idx < toks.length) ? toks[idx].text : ""
-        readonly property string nextText: (idx + 1 < toks.length) ? toks[idx + 1].text : ""
+        readonly property string curText: (idx >= 0 && idx < toks.length) ? toks[idx].text : (toks.length > 0 ? "♪ ♪ ♪" : "")
+        readonly property string nextText: (idx === -1 && toks.length > 0)
+                                           ? toks[0].text
+                                           : ((idx + 1 < toks.length) ? toks[idx + 1].text : "")
 
         // Slot 0: Previous Word (Receding upward, Stage 1)
         Item {
@@ -231,7 +250,7 @@ Item {
             y: kineticBarrel.centerY - 34 - height / 2
             width: prevTxt.implicitWidth
             height: prevTxt.implicitHeight
-            opacity: prevText.length > 0 ? 0.35 : 0.0
+            opacity: kineticBarrel.prevText.length > 0 ? 0.35 : 0.0
             scale: 0.88
 
             Behavior on y { NumberAnimation { duration: 220; easing.type: Easing.OutQuint } }
@@ -255,7 +274,7 @@ Item {
             y: kineticBarrel.centerY - height / 2
             width: Math.max(80, curTxt.implicitWidth + 28)
             height: curTxt.implicitHeight + 10
-            opacity: curText.length > 0 ? 1.0 : 0.0
+            opacity: kineticBarrel.curText.length > 0 ? (kineticBarrel.idx === -1 ? 0.45 : 1.0) : 0.0
 
             Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutQuint } }
             Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutQuad } }
@@ -268,6 +287,7 @@ Item {
                 border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.65)
                 border.width: 1
                 z: -1
+                visible: kineticBarrel.idx >= 0
 
                 // Subtle ambient glow border
                 Rectangle {
@@ -306,7 +326,7 @@ Item {
             y: kineticBarrel.centerY + 34 - height / 2
             width: nextTxt.implicitWidth
             height: nextTxt.implicitHeight
-            opacity: nextText.length > 0 ? 0.45 : 0.0
+            opacity: kineticBarrel.nextText.length > 0 ? 0.45 : 0.0
             scale: 0.90
 
             Behavior on y { NumberAnimation { duration: 220; easing.type: Easing.OutQuint } }
