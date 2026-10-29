@@ -13,3 +13,4 @@ WavySeekBar WavySeekBar.qml
 MonolineIcon MonolineIcon.qml
 TacticalChronometer TacticalChronometer.qml
 TacticalPomodoro TacticalPomodoro.qml
+MiniCairo MiniCairo.qml
