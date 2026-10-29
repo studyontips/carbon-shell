@@ -38,7 +38,7 @@ Ensure the following packages are installed on your system:
 Clone the repository and run the installer:
 
 ```bash
-git clone https://github.com/studyontips/carbon-shell.git
+git clone https://github.com/xzshogun/carbon-shell.git
 cd carbon-shell
 chmod +x install.sh
 ./install.sh

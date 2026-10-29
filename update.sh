@@ -125,7 +125,7 @@ if [[ -z "$REPO_DIR" ]]; then
     else
         if prompt_confirm "Clone repository to $DEFAULT_CLONE? [Y/n]: " "Y"; then
             mkdir -p "$(dirname "$DEFAULT_CLONE")"
-            git clone "${CARBON_REMOTE_URL:-https://github.com/studyontips/carbon-shell.git}" "$DEFAULT_CLONE"
+            git clone "${CARBON_REMOTE_URL:-https://github.com/xzshogun/carbon-shell.git}" "$DEFAULT_CLONE"
             REPO_DIR="$DEFAULT_CLONE"
         else
             die "Cannot update without local repository."

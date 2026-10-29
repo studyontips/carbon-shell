@@ -202,7 +202,7 @@ if [[ -z "$REPO_DIR" ]]; then
     else
         if prompt_confirm "  Clone repository to $DEFAULT_CLONE_DIR? [Y/n]: " "Y"; then
             mkdir -p "$(dirname "$DEFAULT_CLONE_DIR")"
-            git clone "${CARBON_REMOTE_URL:-https://github.com/studyontips/carbon-shell.git}" "$DEFAULT_CLONE_DIR" 2>/dev/null || \
+            git clone "${CARBON_REMOTE_URL:-https://github.com/xzshogun/carbon-shell.git}" "$DEFAULT_CLONE_DIR" 2>/dev/null || \
                 die "Failed to clone repository. Please check your internet connection."
             REPO_DIR="$DEFAULT_CLONE_DIR"
         else
