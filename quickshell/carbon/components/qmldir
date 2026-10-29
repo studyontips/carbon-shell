@@ -12,3 +12,4 @@ StaticCarbonLogo StaticCarbonLogo.qml
 WavySeekBar WavySeekBar.qml
 MonolineIcon MonolineIcon.qml
 TacticalChronometer TacticalChronometer.qml
+TacticalPomodoro TacticalPomodoro.qml
