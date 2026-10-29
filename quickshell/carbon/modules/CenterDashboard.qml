@@ -386,6 +386,7 @@ Item {
                 Layout.fillWidth: true
                 Layout.preferredWidth: 320
                 Layout.fillHeight: true
+                clip: true
 
                 TacticalChronometer {
                     anchors.centerIn: parent

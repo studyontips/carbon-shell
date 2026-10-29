@@ -69,8 +69,8 @@ Item {
     // ── Superellipse Keep-Out Boundary ─────────────────────────────────────────
     // Guarantees stars and trails never touch or overlap the typography
     function getTextClearanceRadius(theta) {
-        var w = 98.0
-        var h = 52.0
+        var w = 76.0
+        var h = 40.0
         var n = 3.2
         var cosA = Math.abs(Math.cos(theta))
         var sinA = Math.abs(Math.sin(theta))
@@ -97,7 +97,7 @@ Item {
     // Trail buffers (longer buffer for sweeping graceful petal ribbons)
     property var trail1: []
     property var trail2: []
-    readonly property int maxTrail: 52
+    readonly property int maxTrail: 46
 
     function updateOrbits(dt) {
         root.animTime += dt
@@ -111,7 +111,7 @@ Item {
         var th1 = t * speed
         var rClear1 = root.getTextClearanceRadius(th1)
         var lobe1 = (1.0 + Math.cos(4.0 * th1)) * 0.5
-        var r1 = rClear1 + 8.0 + lobe1 * 36.0
+        var r1 = rClear1 + 5.0 + lobe1 * 24.0
         root.p1X = cx + r1 * Math.cos(th1)
         root.p1Y = cy + r1 * Math.sin(th1)
 
@@ -119,7 +119,7 @@ Item {
         var th2 = -t * speed + Math.PI * 0.5
         var rClear2 = root.getTextClearanceRadius(th2)
         var lobe2 = (1.0 + Math.cos(4.0 * th2)) * 0.5
-        var r2 = rClear2 + 8.0 + lobe2 * 36.0
+        var r2 = rClear2 + 5.0 + lobe2 * 24.0
         root.p2X = cx + r2 * Math.cos(th2)
         root.p2Y = cy + r2 * Math.sin(th2)
 
@@ -279,9 +279,9 @@ Item {
             spacing: 5
 
             Rectangle {
-                width: 5
-                height: 5
-                radius: 2.5
+                width: 4
+                height: 4
+                radius: 2
                 color: Theme.primary
                 opacity: 0.6 + root.beaconPulse * 0.4
             }
@@ -289,9 +289,9 @@ Item {
             Text {
                 text: "QUAD COMPASS ROSE"
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontPx(8)
+                font.pixelSize: Theme.fontPx(7.5)
                 font.weight: Font.Bold
-                font.letterSpacing: 1.8
+                font.letterSpacing: 1.6
                 color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.85)
             }
         }
@@ -304,7 +304,7 @@ Item {
             Text {
                 text: root.hourStr
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontPx(44)
+                font.pixelSize: Theme.fontPx(36)
                 font.weight: Font.Black
                 color: Theme.fg
                 horizontalAlignment: Text.AlignRight
@@ -313,7 +313,7 @@ Item {
             Text {
                 text: ":"
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontPx(44)
+                font.pixelSize: Theme.fontPx(36)
                 font.weight: Font.Light
                 color: Theme.primary
                 opacity: 0.7 + root.beaconPulse * 0.3
@@ -322,7 +322,7 @@ Item {
             Text {
                 text: root.minStr
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontPx(44)
+                font.pixelSize: Theme.fontPx(36)
                 font.weight: Font.Black
                 color: Theme.fg
                 horizontalAlignment: Text.AlignLeft
@@ -332,15 +332,15 @@ Item {
         // Floating Date & Seconds Indicator
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
-            spacing: 6
+            spacing: 5
             visible: root.showDate
 
             Text {
                 text: root.dateStr
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontPx(10)
+                font.pixelSize: Theme.fontPx(9.5)
                 font.weight: Font.Bold
-                font.letterSpacing: 1.5
+                font.letterSpacing: 1.4
                 color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.65)
             }
 
@@ -353,9 +353,9 @@ Item {
 
             // Micro Seconds Badge
             Rectangle {
-                implicitWidth: secText.implicitWidth + 10
-                implicitHeight: 18
-                radius: 9
+                implicitWidth: secText.implicitWidth + 8
+                implicitHeight: 16
+                radius: 8
                 color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.12)
                 border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.28)
                 border.width: 1
@@ -365,7 +365,7 @@ Item {
                     anchors.centerIn: parent
                     text: root.secStr + "s"
                     font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontPx(10)
+                    font.pixelSize: Theme.fontPx(9.5)
                     font.weight: Font.Bold
                     color: Theme.primary
                 }
