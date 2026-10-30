@@ -58,8 +58,8 @@ Item {
 
                     Text {
                         text: "CARBON // SETTINGS HUB"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 13
+                        font.family: Theme.font
+                        font.pixelSize: Theme.fontPx(13)
                         font.weight: Font.Bold
                         color: Theme.primary
                     }
@@ -79,7 +79,7 @@ Item {
                             anchors.centerIn: parent
                             text: "✕"
                             font.family: Theme.fontMono
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fontPx(13)
                             color: Qt.rgba(1, 1, 1, 0.70)
                         }
 
@@ -159,15 +159,15 @@ Item {
 
                                     Text {
                                         text: modelData.glyph
-                                        font.family: Theme.font
-                                        font.pixelSize: 15
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontPx(15)
                                         color: (root.currentSection === modelData.name) ? Theme.primary : Qt.rgba(1, 1, 1, 0.60)
                                     }
 
                                     Text {
                                         text: modelData.name
                                         font.family: Theme.font
-                                        font.pixelSize: 13
+                                        font.pixelSize: Theme.fontPx(13)
                                         font.weight: (root.currentSection === modelData.name) ? Font.DemiBold : Font.Normal
                                         color: (root.currentSection === modelData.name) ? Qt.rgba(1, 1, 1, 0.95) : Qt.rgba(1, 1, 1, 0.65)
                                         Layout.fillWidth: true
@@ -177,7 +177,7 @@ Item {
                                         visible: modelData.badge.length > 0
                                         text: modelData.badge
                                         font.family: Theme.fontMono
-                                        font.pixelSize: 9
+                                        font.pixelSize: Theme.fontPx(9)
                                         font.weight: Font.Bold
                                         color: Theme.primary
                                     }
@@ -199,7 +199,7 @@ Item {
                         Text {
                             text: "CARBON // v2.6.4"
                             font.family: Theme.fontMono
-                            font.pixelSize: 10
+                            font.pixelSize: Theme.fontPx(10)
                             color: Qt.rgba(1, 1, 1, 0.25)
                             Layout.alignment: Qt.AlignHCenter
                             Layout.bottomMargin: 12
@@ -235,8 +235,8 @@ Item {
 
                             Text {
                                 text: root.currentSection.toUpperCase() + " SETTINGS"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 14
+                                font.family: Theme.font
+                                font.pixelSize: Theme.fontPx(14)
                                 font.weight: Font.Bold
                                 color: Qt.rgba(1, 1, 1, 0.50)
                                 Layout.alignment: Qt.AlignHCenter
@@ -245,7 +245,7 @@ Item {
                             Text {
                                 text: "Section under active development"
                                 font.family: Theme.font
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.fontPx(12)
                                 color: Qt.rgba(1, 1, 1, 0.30)
                                 Layout.alignment: Qt.AlignHCenter
                             }

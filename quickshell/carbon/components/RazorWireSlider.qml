@@ -28,7 +28,7 @@ Item {
             Text {
                 text: root.label
                 font.family: Theme.font
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontPx(12)
                 font.weight: Font.Medium
                 color: Qt.rgba(1, 1, 1, 0.85)
                 Layout.alignment: Qt.AlignLeft
@@ -39,7 +39,7 @@ Item {
             Text {
                 text: root.value.toFixed(root.decimals) + (root.unit.length > 0 ? (" " + root.unit) : "")
                 font.family: Theme.fontMono
-                font.pixelSize: 11
+                font.pixelSize: Theme.fontPx(11)
                 font.weight: Font.DemiBold
                 color: Theme.primary
                 Layout.alignment: Qt.AlignRight

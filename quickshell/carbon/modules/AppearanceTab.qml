@@ -192,8 +192,8 @@ Item {
                     // Section Header: Wallpaper Gallery
                     Text {
                         text: "WALLPAPER GALLERY"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 11
+                        font.family: Theme.font
+                        font.pixelSize: Theme.fontPx(11)
                         font.weight: Font.Bold
                         color: Qt.rgba(1, 1, 1, 0.45)
                     }
@@ -236,8 +236,8 @@ Item {
                                 id: shuffleText
                                 anchors.centerIn: parent
                                 text: "⤨  SHUFFLE RANDOM"
-                                font.family: Theme.fontMono
-                                font.pixelSize: 11
+                                font.family: Theme.font
+                                font.pixelSize: Theme.fontPx(11)
                                 font.weight: Font.DemiBold
                                 color: Qt.rgba(1, 1, 1, 0.90)
                             }
@@ -259,7 +259,7 @@ Item {
                             Text {
                                 text: "Live BG Pause"
                                 font.family: Theme.font
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.fontPx(12)
                                 color: Qt.rgba(1, 1, 1, 0.70)
                             }
 
@@ -332,7 +332,7 @@ Item {
                     Text {
                         text: "Matugen Color Scheme"
                         font.family: Theme.font
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fontPx(12)
                         font.weight: Font.Medium
                         color: Qt.rgba(1, 1, 1, 0.85)
                     }
@@ -367,8 +367,8 @@ Item {
 
                                 Text {
                                     text: modelData.name
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 9
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(9)
                                     color: Qt.rgba(1, 1, 1, 0.40)
                                     Layout.alignment: Qt.AlignHCenter
                                 }
@@ -394,9 +394,9 @@ Item {
                                 Text {
                                     anchors.centerIn: parent
                                     text: modelData
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: 11
-                                    font.weight: (root.activeScheme === modelData) ? Font.Bold : Font.Normal
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(11)
+                                    font.weight: (root.activeScheme === modelData) ? Font.DemiBold : Font.Normal
                                     color: (root.activeScheme === modelData) ? Theme.primary : Qt.rgba(1, 1, 1, 0.65)
                                 }
 
@@ -449,8 +449,8 @@ Item {
                     // Section Header: Hyprland Compositor Controls
                     Text {
                         text: "COMPOSITOR & EFFECTS"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 11
+                        font.family: Theme.font
+                        font.pixelSize: Theme.fontPx(11)
                         font.weight: Font.Bold
                         color: Qt.rgba(1, 1, 1, 0.45)
                     }
@@ -539,8 +539,8 @@ Item {
                     // Feature Matrix Header
                     Text {
                         text: "FEATURE TOGGLE MATRIX"
-                        font.family: Theme.fontMono
-                        font.pixelSize: 11
+                        font.family: Theme.font
+                        font.pixelSize: Theme.fontPx(11)
                         font.weight: Font.Bold
                         color: Qt.rgba(1, 1, 1, 0.45)
                     }
@@ -551,7 +551,7 @@ Item {
                         Text {
                             text: "Enable Window Shadows"
                             font.family: Theme.font
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fontPx(13)
                             font.weight: Font.Medium
                             color: Qt.rgba(1, 1, 1, 0.85)
                             Layout.fillWidth: true
@@ -572,7 +572,7 @@ Item {
                         Text {
                             text: "Ambient Glow (Audio Borders)"
                             font.family: Theme.font
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fontPx(13)
                             font.weight: Font.Medium
                             color: Qt.rgba(1, 1, 1, 0.85)
                             Layout.fillWidth: true
@@ -595,7 +595,7 @@ Item {
                         Text {
                             text: "Material-3 Transitions"
                             font.family: Theme.font
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fontPx(13)
                             font.weight: Font.Medium
                             color: Qt.rgba(1, 1, 1, 0.85)
                             Layout.fillWidth: true

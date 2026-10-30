@@ -33,7 +33,7 @@ Item {
         anchors.centerIn: parent
         text: root.checked ? "[ ◆ ON ]" : "[ ◇ OFF ]"
         font.family: Theme.fontMono
-        font.pixelSize: 11
+        font.pixelSize: Theme.fontPx(11)
         font.weight: Font.DemiBold
         color: root.checked ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
 
