@@ -56,3 +56,4 @@ AudioDevicePicker AudioDevicePicker.qml
 ControlHub ControlHub.qml
 AppearanceTab AppearanceTab.qml
 SettingsHub SettingsHub.qml
+DisplaysTab DisplaysTab.qml
