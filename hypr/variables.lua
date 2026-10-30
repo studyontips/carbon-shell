@@ -87,7 +87,8 @@ return {
     kbSpecialWs                = "SUPER + S",
     kbSystemMonitorWs          = "CTRL + SHIFT + Escape",
     kbMusicWs                  = "SUPER + M",
-    kbCommunicationWs          = "SUPER + D",
+    -- kbCommunicationWs          = "SUPER + D",
+    kbCarbonDrop               = "SUPER + D",
     kbTodoWs                   = "SUPER + R",
 
     -- Apps

@@ -141,7 +141,7 @@ hl.bind(vars.kbCloseWindow, hl.dsp.window.close())
 hl.bind(vars.kbSpecialWs, hl.dsp.exec_cmd("caelestia toggle specialws"))
 hl.bind(vars.kbSystemMonitorWs, hl.dsp.exec_cmd("caelestia toggle sysmon"))
 hl.bind(vars.kbMusicWs, hl.dsp.exec_cmd("caelestia toggle music"))
-hl.bind(vars.kbCommunicationWs, hl.dsp.exec_cmd("caelestia toggle communication"))
+if vars.kbCommunicationWs then hl.bind(vars.kbCommunicationWs, hl.dsp.exec_cmd("caelestia toggle communication")) end
 hl.bind(vars.kbTodoWs, hl.dsp.exec_cmd("caelestia toggle todo"))
 
 -- Apps
@@ -150,6 +150,7 @@ hl.bind(vars.kbBrowser, hl.dsp.exec_cmd(vars.browser))
 hl.bind(vars.kbEditor, hl.dsp.exec_cmd(vars.editor))
 hl.bind(vars.kbPomodoro, hl.dsp.exec_cmd(vars.pomodoro))
 hl.bind(vars.kbFileExplorer, hl.dsp.exec_cmd(vars.fileExplorer))
+if vars.kbCarbonDrop then hl.bind(vars.kbCarbonDrop, hl.dsp.exec_cmd("~/.config/carbon/scripts/carbon-drop.sh")) end
 hl.bind("SUPER + H", hl.dsp.exec_cmd("discord"))
 hl.bind("SUPER + E", hl.dsp.exec_cmd("rofi -show drun"))
 hl.bind("CTRL + ALT + V", hl.dsp.exec_cmd(vars.audioSettings))
