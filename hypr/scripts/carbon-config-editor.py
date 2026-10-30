@@ -912,6 +912,7 @@ class ConfigEditorWindow(Adw.ApplicationWindow):
         self.accent_lit = theme.get("accentLit", "#fcd5dc")
         self.theme_mode = theme.get("mode", "dark" if theme.get("isDark", True) else "light")
         self.is_dark = (self.theme_mode == "dark")
+        self.theme_mode_btn_pairs = []
 
         # Loaded Configs
         self.bar_mode = read_json(BAR_MODE_PATH, {"mode": "notch", "islandStyle": "notch"})
@@ -1406,7 +1407,7 @@ class ConfigEditorWindow(Adw.ApplicationWindow):
             ("blank_tile", "Blank Tile", "image-x-generic-symbolic", "Blank Tile Customization", "Personalize the top hero tile in Spotlight & Vanish launcher with custom image regions.", self.build_blank_tile_page),
             ("media", "Media", "folder-music-symbolic", "Media", "Media player controls, spinning vinyl disc, and audio visualizer.", self.build_media_page),
             ("clock", "Clock & Date", "preferences-system-time-symbolic", "Clock & Date", "Time formatting, clock typography designs, and calendar integration.", self.build_clock_page),
-            ("looknfeel", "Look & Feel", "preferences-desktop-appearance-symbolic", "Look & Feel", "Hyprland window borders, gaps, layout, decorations, blur, and shadows.", self.build_looknfeel_page),
+            ("appearance", "Appearance", "preferences-desktop-appearance-symbolic", "Appearance", "Color scheme, window borders, gaps, corner rounding, blur, shadows, and shell visuals.", self.build_appearance_page),
             ("motion", "Motion", "media-playlist-repeat-symbolic", "Motion", "How fast the shell animates, or whether it animates at all.", self.build_motion_page),
             ("launcher", "Launcher", "system-search-symbolic", "Launcher", "Spotlight search, application launcher, and quick actions.", self.build_launcher_page),
             ("notifications", "Notifications", "preferences-system-notifications-symbolic", "Notifications", "Banner popups, notification badges, and Do Not Disturb.", self.build_notifications_page),
@@ -1469,6 +1470,8 @@ class ConfigEditorWindow(Adw.ApplicationWindow):
         initial_cat = "bar"
         for arg in sys.argv[1:]:
             a = arg.lstrip("-").lower()
+            if a in ("looknfeel", "look_and_feel", "look-and-feel"):
+                a = "appearance"
             if a in self.nav_rows:
                 initial_cat = a
                 break
@@ -1921,6 +1924,17 @@ class ConfigEditorWindow(Adw.ApplicationWindow):
                 self.btn_light_mode.add_css_class("active")
                 self.btn_dark_mode.remove_css_class("active")
 
+        for b_dark, b_light in getattr(self, "theme_mode_btn_pairs", []):
+            try:
+                if self.is_dark:
+                    b_dark.add_css_class("active")
+                    b_light.remove_css_class("active")
+                else:
+                    b_light.add_css_class("active")
+                    b_dark.remove_css_class("active")
+            except Exception:
+                pass
+
         self.lbl_status.set_text(f"Applying Material You {target_mode.capitalize()} mode...")
 
         def run_theme_switch():
@@ -1988,6 +2002,8 @@ class ConfigEditorWindow(Adw.ApplicationWindow):
         seg_theme.append(self.btn_light_mode)
         row_theme.append(seg_theme)
         card_theme.append(row_theme)
+        if (self.btn_dark_mode, self.btn_light_mode) not in self.theme_mode_btn_pairs:
+            self.theme_mode_btn_pairs.append((self.btn_dark_mode, self.btn_light_mode))
         self.register_search_item(self.current_cat_id, "Color Scheme", "Toggle dynamic Light or Dark Material You theme", row_theme)
         page.append(card_theme)
 
@@ -2731,11 +2747,63 @@ class ConfigEditorWindow(Adw.ApplicationWindow):
         page.append(card)
         return page
 
-    # ── Category 5: Look & Feel (Configures ~/.config/carbon/looknfeel.conf) ─
-    def build_looknfeel_page(self, icon, title, subtitle):
+    # ── Category 6: Appearance (Configures Theme, Window Borders, Gaps, Opacity, Blur, Shadows) ─
+    def build_appearance_page(self, icon, title, subtitle):
         page = self.create_page_container(icon, title, subtitle)
 
-        # ── Card 1: Windows & Layout ──
+        # ── Card 1: Color Scheme & Theme ──
+        card_theme = self.create_settings_card()
+
+        row_theme = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        row_theme.add_css_class("settings-row")
+        row_theme.set_hexpand(True)
+
+        theme_lbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        theme_lbox.set_hexpand(True)
+        lbl_th_t = Gtk.Label(label="Color Scheme")
+        lbl_th_t.set_halign(Gtk.Align.START)
+        lbl_th_t.add_css_class("row-title")
+        theme_lbox.append(lbl_th_t)
+
+        lbl_th_s = Gtk.Label(label="Dynamic Material You palette generated from active wallpaper")
+        lbl_th_s.set_halign(Gtk.Align.START)
+        lbl_th_s.set_wrap(True)
+        lbl_th_s.set_wrap_mode(Pango.WrapMode.WORD)
+        lbl_th_s.set_max_width_chars(28)
+        lbl_th_s.add_css_class("row-subtitle")
+        theme_lbox.append(lbl_th_s)
+        row_theme.append(theme_lbox)
+
+        seg_theme = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+        seg_theme.add_css_class("segmented-group")
+        seg_theme.set_valign(Gtk.Align.CENTER)
+        seg_theme.set_halign(Gtk.Align.END)
+
+        btn_app_dark = Gtk.Button(label="Dark")
+        btn_app_dark.add_css_class("mode-tab-btn")
+        btn_app_light = Gtk.Button(label="Light")
+        btn_app_light.add_css_class("mode-tab-btn")
+
+        if self.is_dark:
+            btn_app_dark.add_css_class("active")
+        else:
+            btn_app_light.add_css_class("active")
+
+        btn_app_dark.connect("clicked", lambda b: self.on_theme_mode_clicked("dark"))
+        btn_app_light.connect("clicked", lambda b: self.on_theme_mode_clicked("light"))
+
+        seg_theme.append(btn_app_dark)
+        seg_theme.append(btn_app_light)
+        row_theme.append(seg_theme)
+        card_theme.append(row_theme)
+        if (btn_app_dark, btn_app_light) not in self.theme_mode_btn_pairs:
+            self.theme_mode_btn_pairs.append((btn_app_dark, btn_app_light))
+        self.register_search_item(self.current_cat_id, "Color Scheme", "Toggle dynamic Light or Dark Material You theme", row_theme)
+        self.register_search_item(self.current_cat_id, "Appearance", "Hyprland window styling, borders, gaps, blur, shadows, and color scheme", card_theme)
+        self.register_search_item(self.current_cat_id, "Look & Feel", "Hyprland window styling, borders, gaps, blur, shadows, and color scheme", card_theme)
+        page.append(card_theme)
+
+        # ── Card 2: Windows & Layout ──
         card_win = self.create_settings_card()
         lbl_win = Gtk.Label(label="Windows & Layout")
         lbl_win.set_halign(Gtk.Align.START)
@@ -2977,6 +3045,8 @@ class ConfigEditorWindow(Adw.ApplicationWindow):
 
         page.append(card_wp)
         return page
+
+    build_looknfeel_page = build_appearance_page
 
     # ── Category 6: Motion ──────────────────────────────────────────────────
     def build_motion_page(self, icon, title, subtitle):
