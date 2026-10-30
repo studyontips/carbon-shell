@@ -159,234 +159,240 @@ Item {
         Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 230
-            clip: true
 
-            // Dotted Matrix Grid (2px dots, 16px spacing, opacity 0.1)
-            Canvas {
-                id: blueprintCanvas
+            // Inset Card Container with Rounded Corners & Clip to prevent bleeding
+            Rectangle {
                 anchors.fill: parent
-                opacity: 0.10
-                onPaint: {
-                    var ctx = getContext("2d")
-                    ctx.clearRect(0, 0, width, height)
-                    ctx.fillStyle = "#FFFFFF"
-                    var spacing = 16
-                    for (var x = spacing / 2; x < width; x += spacing) {
-                        for (var y = spacing / 2; y < height; y += spacing) {
-                            ctx.beginPath()
-                            ctx.arc(x, y, 1, 0, Math.PI * 2)
-                            ctx.fill()
+                anchors.margins: 14
+                radius: 14
+                color: Qt.rgba(0, 0, 0, 0.25)
+                border.color: Qt.rgba(1, 1, 1, 0.08)
+                border.width: 1
+                clip: true
+
+                // Dotted Matrix Grid (2px dots, 16px spacing, opacity 0.08)
+                Canvas {
+                    id: blueprintCanvas
+                    anchors.fill: parent
+                    opacity: 0.08
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.clearRect(0, 0, width, height)
+                        ctx.fillStyle = "#FFFFFF"
+                        var spacing = 16
+                        for (var x = spacing / 2; x < width; x += spacing) {
+                            for (var y = spacing / 2; y < height; y += spacing) {
+                                ctx.beginPath()
+                                ctx.arc(x, y, 1, 0, Math.PI * 2)
+                                ctx.fill()
+                            }
                         }
                     }
                 }
-            }
 
-            // Blueprint Header Overlay
-            RowLayout {
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.topMargin: 14
-                anchors.leftMargin: 20
-                spacing: 8
+                // Interactive Monitor Nodes in Blueprint
+                RowLayout {
+                    anchors.centerIn: parent
+                    spacing: 28
 
-                Text {
-                    text: "VIRTUAL DESKTOP MATRIX"
-                    font.family: Theme.font
-                    font.pixelSize: Theme.fontPx(10)
-                    font.weight: Font.Bold
-                    color: Qt.rgba(1, 1, 1, 0.35)
-                }
+                    // -----------------------------------------------------------
+                    // Node 1: eDP-1 (Active / Primary Laptop Display)
+                    // -----------------------------------------------------------
+                    Item {
+                        id: edp1Container
+                        readonly property bool isPortrait: (root.monitorTransform === 1 || root.monitorTransform === 3)
+                        readonly property bool isSelected: root.selectedMonitor === "eDP-1"
+                        
+                        // Strictly sized to stay cleanly bounded inside card:
+                        // Landscape: 188 x 104 (fits easily)
+                        // Portrait:  104 x 164 (comfortably leaves ~19px padding top and bottom)
+                        width: isPortrait ? 104 : 188
+                        height: isPortrait ? 164 : 104
 
-                Text {
-                    text: "// TOPOLOGY VIEW"
-                    font.family: Theme.fontMono
-                    font.pixelSize: Theme.fontPx(9)
-                    color: Theme.primary
-                }
-            }
+                        scale: edp1Mouse.pressed ? 0.97 : (edp1Mouse.containsMouse ? 1.03 : 1.0)
 
-            // Interactive Monitor Nodes in Blueprint
-            RowLayout {
-                anchors.centerIn: parent
-                spacing: 32
+                        Behavior on width {
+                            NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
+                        }
+                        Behavior on height {
+                            NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
+                        }
+                        Behavior on scale {
+                            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                        }
 
-                // -----------------------------------------------------------
-                // Node 1: eDP-1 (Active / Primary Laptop Display)
-                // -----------------------------------------------------------
-                Item {
-                    id: edp1Container
-                    readonly property bool isPortrait: (root.monitorTransform === 1 || root.monitorTransform === 3)
-                    readonly property bool isSelected: root.selectedMonitor === "eDP-1"
-                    
-                    // Dimensional Morphing: width & height animated with InOutExpo (400ms)
-                    width: isPortrait ? 124 : 220
-                    height: isPortrait ? 220 : 124
-
-                    Behavior on width {
-                        NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
-                    }
-                    Behavior on height {
-                        NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 12
-                        color: Qt.rgba(0.06, 0.06, 0.08, 0.75)
-                        border.width: edp1Container.isSelected ? 1.5 : 1
-                        border.color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.15)
-
-                        Behavior on border.color { ColorAnimation { duration: 200 } }
-
-                        // Glowing ambient halo when selected
                         Rectangle {
                             anchors.fill: parent
                             radius: 12
-                            color: "transparent"
-                            border.width: 1
-                            border.color: edp1Container.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35) : "transparent"
-                            opacity: edp1Container.isSelected ? 1 : 0
-                            Behavior on opacity { NumberAnimation { duration: 250 } }
-                        }
+                            color: Qt.rgba(0.06, 0.06, 0.08, 0.85)
+                            border.width: edp1Container.isSelected ? 1.5 : 1
+                            border.color: edp1Container.isSelected ? Theme.primary : (edp1Mouse.containsMouse ? Qt.rgba(1, 1, 1, 0.30) : Qt.rgba(1, 1, 1, 0.12))
 
-                        // Content inside node stays strictly upright & horizontal (NO rotation)
-                        ColumnLayout {
-                            anchors.centerIn: parent
-                            spacing: 4
+                            Behavior on border.color { ColorAnimation { duration: 200 } }
+                            Behavior on color { ColorAnimation { duration: 200 } }
 
-                            Text {
-                                text: "eDP-1"
-                                font.family: Theme.font
-                                font.pixelSize: Theme.fontPx(13)
-                                font.weight: Font.Bold
-                                color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.90)
-                                Layout.alignment: Qt.AlignHCenter
-                            }
-
-                            Text {
-                                text: root.monitorWidth + " × " + root.monitorHeight
-                                font.family: Theme.fontMono
-                                font.pixelSize: Theme.fontPx(11)
-                                color: Qt.rgba(1, 1, 1, 0.60)
-                                Layout.alignment: Qt.AlignHCenter
-                            }
-
-                            Text {
-                                text: Math.round(root.monitorRate) + "Hz  •  " + (edp1Container.isPortrait ? "Portrait" : "Landscape")
-                                font.family: Theme.fontMono
-                                font.pixelSize: Theme.fontPx(9)
-                                color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.40)
-                                Layout.alignment: Qt.AlignHCenter
-                            }
-
+                            // Glowing ambient halo when selected
                             Rectangle {
-                                Layout.preferredWidth: 70
-                                Layout.preferredHeight: 16
-                                radius: 4
-                                color: edp1Container.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15) : Qt.rgba(1, 1, 1, 0.05)
-                                Layout.alignment: Qt.AlignHCenter
+                                anchors.fill: parent
+                                anchors.margins: -1
+                                radius: 13
+                                color: "transparent"
+                                border.width: 1
+                                border.color: edp1Container.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40) : "transparent"
+                                opacity: edp1Container.isSelected ? 1 : 0
+                                Behavior on opacity { NumberAnimation { duration: 250 } }
+                            }
+
+                            // Content inside node stays strictly upright & horizontal (NO rotation)
+                            ColumnLayout {
+                                anchors.centerIn: parent
+                                spacing: 3
 
                                 Text {
-                                    anchors.centerIn: parent
-                                    text: "PRIMARY"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontPx(8)
+                                    text: "eDP-1"
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(13)
                                     font.weight: Font.Bold
-                                    color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.40)
+                                    color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.90)
+                                    Layout.alignment: Qt.AlignHCenter
                                 }
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.selectedMonitor = "eDP-1"
-                        }
-                    }
-                }
-
-                // -----------------------------------------------------------
-                // Node 2: DP-1 (Secondary / External Node)
-                // -----------------------------------------------------------
-                Item {
-                    id: dp1Container
-                    readonly property bool isPortrait: (root.dp1Transform === 1 || root.dp1Transform === 3)
-                    readonly property bool isSelected: root.selectedMonitor === "DP-1"
-                    
-                    // Dimensional Morphing: width & height animated with InOutExpo (400ms)
-                    width: isPortrait ? 124 : 220
-                    height: isPortrait ? 220 : 124
-
-                    Behavior on width {
-                        NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
-                    }
-                    Behavior on height {
-                        NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 12
-                        color: Qt.rgba(0.06, 0.06, 0.08, 0.75)
-                        border.width: dp1Container.isSelected ? 1.5 : 1
-                        border.color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.15)
-
-                        Behavior on border.color { ColorAnimation { duration: 200 } }
-
-                        // Content inside node stays strictly upright & horizontal (NO rotation)
-                        ColumnLayout {
-                            anchors.centerIn: parent
-                            spacing: 4
-
-                            Text {
-                                text: "DP-1"
-                                font.family: Theme.font
-                                font.pixelSize: Theme.fontPx(13)
-                                font.weight: Font.Bold
-                                color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.90)
-                                Layout.alignment: Qt.AlignHCenter
-                            }
-
-                            Text {
-                                text: root.dp1Width + " × " + root.dp1Height
-                                font.family: Theme.fontMono
-                                font.pixelSize: Theme.fontPx(11)
-                                color: Qt.rgba(1, 1, 1, 0.60)
-                                Layout.alignment: Qt.AlignHCenter
-                            }
-
-                            Text {
-                                text: Math.round(root.dp1Rate) + "Hz  •  " + (dp1Container.isPortrait ? "Portrait" : "Landscape")
-                                font.family: Theme.fontMono
-                                font.pixelSize: Theme.fontPx(9)
-                                color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.40)
-                                Layout.alignment: Qt.AlignHCenter
-                            }
-
-                            Rectangle {
-                                Layout.preferredWidth: 70
-                                Layout.preferredHeight: 16
-                                radius: 4
-                                color: dp1Container.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15) : Qt.rgba(1, 1, 1, 0.05)
-                                Layout.alignment: Qt.AlignHCenter
 
                                 Text {
-                                    anchors.centerIn: parent
-                                    text: "EXT // STANDBY"
+                                    text: root.monitorWidth + " × " + root.monitorHeight
                                     font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontPx(8)
-                                    font.weight: Font.Bold
-                                    color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.40)
+                                    font.pixelSize: Theme.fontPx(10)
+                                    color: Qt.rgba(1, 1, 1, 0.60)
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Text {
+                                    text: Math.round(root.monitorRate) + "Hz  •  " + (edp1Container.isPortrait ? "Portrait" : "Landscape")
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontPx(9)
+                                    color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Rectangle {
+                                    Layout.preferredWidth: 68
+                                    Layout.preferredHeight: 16
+                                    radius: 6
+                                    color: edp1Container.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) : Qt.rgba(1, 1, 1, 0.06)
+                                    Layout.alignment: Qt.AlignHCenter
+
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "PRIMARY"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontPx(8)
+                                        font.weight: Font.Bold
+                                        color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
+                                    }
                                 }
                             }
+
+                            MouseArea {
+                                id: edp1Mouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.selectedMonitor = "eDP-1"
+                            }
+                        }
+                    }
+
+                    // -----------------------------------------------------------
+                    // Node 2: DP-1 (Secondary / External Node)
+                    // -----------------------------------------------------------
+                    Item {
+                        id: dp1Container
+                        readonly property bool isPortrait: (root.dp1Transform === 1 || root.dp1Transform === 3)
+                        readonly property bool isSelected: root.selectedMonitor === "DP-1"
+                        
+                        width: isPortrait ? 104 : 188
+                        height: isPortrait ? 164 : 104
+
+                        scale: dp1Mouse.pressed ? 0.97 : (dp1Mouse.containsMouse ? 1.03 : 1.0)
+
+                        Behavior on width {
+                            NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
+                        }
+                        Behavior on height {
+                            NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
+                        }
+                        Behavior on scale {
+                            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
                         }
 
-                        MouseArea {
+                        Rectangle {
                             anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.selectedMonitor = "DP-1"
+                            radius: 12
+                            color: Qt.rgba(0.06, 0.06, 0.08, 0.85)
+                            border.width: dp1Container.isSelected ? 1.5 : 1
+                            border.color: dp1Container.isSelected ? Theme.primary : (dp1Mouse.containsMouse ? Qt.rgba(1, 1, 1, 0.30) : Qt.rgba(1, 1, 1, 0.12))
+
+                            Behavior on border.color { ColorAnimation { duration: 200 } }
+                            Behavior on color { ColorAnimation { duration: 200 } }
+
+                            // Content inside node stays strictly upright & horizontal (NO rotation)
+                            ColumnLayout {
+                                anchors.centerIn: parent
+                                spacing: 3
+
+                                Text {
+                                    text: "DP-1"
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(13)
+                                    font.weight: Font.Bold
+                                    color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.90)
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Text {
+                                    text: root.dp1Width + " × " + root.dp1Height
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontPx(10)
+                                    color: Qt.rgba(1, 1, 1, 0.60)
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Text {
+                                    text: Math.round(root.dp1Rate) + "Hz  •  " + (dp1Container.isPortrait ? "Portrait" : "Landscape")
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontPx(9)
+                                    color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                Rectangle {
+                                    Layout.preferredWidth: 72
+                                    Layout.preferredHeight: 16
+                                    radius: 6
+                                    color: dp1Container.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) : Qt.rgba(1, 1, 1, 0.06)
+                                    Layout.alignment: Qt.AlignHCenter
+
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "EXT // STANDBY"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontPx(8)
+                                        font.weight: Font.Bold
+                                        color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: dp1Mouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.selectedMonitor = "DP-1"
+                            }
                         }
                     }
                 }
@@ -441,66 +447,90 @@ Item {
                         }
 
                         // Orientation Selector: [ ⬒ Landscape ] | [ ◧ Portrait ]
-                        RowLayout {
+                        Rectangle {
                             Layout.fillWidth: true
-                            spacing: 0
+                            Layout.preferredHeight: 38
+                            radius: 10
+                            color: Qt.rgba(0, 0, 0, 0.25)
+                            border.color: Qt.rgba(1, 1, 1, 0.08)
+                            border.width: 1
 
-                            readonly property bool isCurrentPortrait: root.selectedMonitor === "eDP-1" ? (root.monitorTransform === 1 || root.monitorTransform === 3) : (root.dp1Transform === 1 || root.dp1Transform === 3)
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 3
+                                spacing: 4
 
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 32
-                                color: !parent.isCurrentPortrait ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15) : (landMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(1, 1, 1, 0.02))
-                                border.color: !parent.isCurrentPortrait ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
-                                border.width: 1
+                                readonly property bool isCurrentPortrait: root.selectedMonitor === "eDP-1" ? (root.monitorTransform === 1 || root.monitorTransform === 3) : (root.dp1Transform === 1 || root.dp1Transform === 3)
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "⬒  Landscape"
-                                    font.family: Theme.font
-                                    font.pixelSize: Theme.fontPx(11)
-                                    font.weight: !parent.parent.isCurrentPortrait ? Font.DemiBold : Font.Normal
-                                    color: !parent.parent.isCurrentPortrait ? Theme.primary : Qt.rgba(1, 1, 1, 0.65)
-                                }
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 8
+                                    color: !parent.isCurrentPortrait ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) : (landMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+                                    border.color: !parent.isCurrentPortrait ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.50) : "transparent"
+                                    border.width: 1
 
-                                MouseArea {
-                                    id: landMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (root.selectedMonitor === "eDP-1") root.monitorTransform = 0
-                                        else root.dp1Transform = 0
-                                        root.sendHub({ "module": "display", "action": "set_orientation", "monitor": root.selectedMonitor, "transform": 0 })
+                                    scale: landMouse.pressed ? 0.98 : (landMouse.containsMouse ? 1.01 : 1.0)
+
+                                    Behavior on color { ColorAnimation { duration: 180 } }
+                                    Behavior on border.color { ColorAnimation { duration: 180 } }
+                                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "⬒  Landscape"
+                                        font.family: Theme.font
+                                        font.pixelSize: Theme.fontPx(11)
+                                        font.weight: !parent.parent.isCurrentPortrait ? Font.DemiBold : Font.Normal
+                                        color: !parent.parent.isCurrentPortrait ? Theme.primary : Qt.rgba(1, 1, 1, 0.65)
+                                    }
+
+                                    MouseArea {
+                                        id: landMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (root.selectedMonitor === "eDP-1") root.monitorTransform = 0
+                                            else root.dp1Transform = 0
+                                            root.sendHub({ "module": "display", "action": "set_orientation", "monitor": root.selectedMonitor, "transform": 0 })
+                                        }
                                     }
                                 }
-                            }
 
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 32
-                                color: parent.isCurrentPortrait ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15) : (portMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(1, 1, 1, 0.02))
-                                border.color: parent.isCurrentPortrait ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
-                                border.width: 1
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 8
+                                    color: parent.isCurrentPortrait ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) : (portMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+                                    border.color: parent.isCurrentPortrait ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.50) : "transparent"
+                                    border.width: 1
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "◧  Portrait"
-                                    font.family: Theme.font
-                                    font.pixelSize: Theme.fontPx(11)
-                                    font.weight: parent.parent.isCurrentPortrait ? Font.DemiBold : Font.Normal
-                                    color: parent.parent.isCurrentPortrait ? Theme.primary : Qt.rgba(1, 1, 1, 0.65)
-                                }
+                                    scale: portMouse.pressed ? 0.98 : (portMouse.containsMouse ? 1.01 : 1.0)
 
-                                MouseArea {
-                                    id: portMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (root.selectedMonitor === "eDP-1") root.monitorTransform = 1
-                                        else root.dp1Transform = 1
-                                        root.sendHub({ "module": "display", "action": "set_orientation", "monitor": root.selectedMonitor, "transform": 1 })
+                                    Behavior on color { ColorAnimation { duration: 180 } }
+                                    Behavior on border.color { ColorAnimation { duration: 180 } }
+                                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "◧  Portrait"
+                                        font.family: Theme.font
+                                        font.pixelSize: Theme.fontPx(11)
+                                        font.weight: parent.parent.isCurrentPortrait ? Font.DemiBold : Font.Normal
+                                        color: parent.parent.isCurrentPortrait ? Theme.primary : Qt.rgba(1, 1, 1, 0.65)
+                                    }
+
+                                    MouseArea {
+                                        id: portMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (root.selectedMonitor === "eDP-1") root.monitorTransform = 1
+                                            else root.dp1Transform = 1
+                                            root.sendHub({ "module": "display", "action": "set_orientation", "monitor": root.selectedMonitor, "transform": 1 })
+                                        }
                                     }
                                 }
                             }
@@ -526,10 +556,14 @@ Item {
                                 // Width Box
                                 Rectangle {
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 34
-                                    color: Qt.rgba(0, 0, 0, 0.35)
+                                    Layout.preferredHeight: 36
+                                    radius: 8
+                                    color: resWInput.activeFocus ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : (wBoxMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(0, 0, 0, 0.35))
                                     border.color: resWInput.activeFocus ? Theme.primary : (wBoxMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(1, 1, 1, 0.10))
                                     border.width: 1
+
+                                    Behavior on color { ColorAnimation { duration: 180 } }
+                                    Behavior on border.color { ColorAnimation { duration: 180 } }
 
                                     TextInput {
                                         id: resWInput
@@ -570,10 +604,14 @@ Item {
                                 // Height Box
                                 Rectangle {
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 34
-                                    color: Qt.rgba(0, 0, 0, 0.35)
+                                    Layout.preferredHeight: 36
+                                    radius: 8
+                                    color: resHInput.activeFocus ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : (hBoxMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(0, 0, 0, 0.35))
                                     border.color: resHInput.activeFocus ? Theme.primary : (hBoxMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(1, 1, 1, 0.10))
                                     border.width: 1
+
+                                    Behavior on color { ColorAnimation { duration: 180 } }
+                                    Behavior on border.color { ColorAnimation { duration: 180 } }
 
                                     TextInput {
                                         id: resHInput
@@ -606,7 +644,7 @@ Item {
                             }
                         }
 
-                        // Refresh Rate Flush Buttons: [ 60Hz ] [ ◆ 120Hz ]
+                        // Refresh Rate Flush Buttons: [ 48Hz ] [ 60Hz ] [ 120Hz ] [ 144Hz ]
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 6
@@ -630,11 +668,18 @@ Item {
 
                                     delegate: Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: 30
+                                        Layout.preferredHeight: 32
+                                        radius: 8
                                         readonly property bool isActive: Math.round(parent.parent.currentRate) === modelData
-                                        color: isActive ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15) : (rateMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(1, 1, 1, 0.02))
+                                        color: isActive ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) : (rateMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(1, 1, 1, 0.02))
                                         border.color: isActive ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
                                         border.width: 1
+
+                                        scale: rateMouse.pressed ? 0.95 : (rateMouse.containsMouse ? 1.04 : 1.0)
+
+                                        Behavior on color { ColorAnimation { duration: 180 } }
+                                        Behavior on border.color { ColorAnimation { duration: 180 } }
+                                        Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
                                         Text {
                                             anchors.centerIn: parent
@@ -763,146 +808,190 @@ Item {
                             color: Qt.rgba(1, 1, 1, 0.45)
                         }
 
-                        // Hardware Feature 1: Variable Refresh Rate (VRR) [ ● / ○ ]
-                        RowLayout {
+                        // Hardware Feature 1: Variable Refresh Rate (VRR)
+                        Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 30
+                            Layout.preferredHeight: 36
+                            radius: 8
+                            color: vrrMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
 
-                            Text {
-                                text: "Variable Refresh Rate (VRR)"
-                                font.family: Theme.font
-                                font.pixelSize: Theme.fontPx(13)
-                                font.weight: Font.Medium
-                                color: Qt.rgba(1, 1, 1, 0.85)
-                                Layout.fillWidth: true
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 8
+
+                                Text {
+                                    text: "Variable Refresh Rate (VRR)"
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(12)
+                                    font.weight: Font.Medium
+                                    color: Qt.rgba(1, 1, 1, 0.85)
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+
+                                TerminalStatusBadge {
+                                    checked: root.vrrEnabled
+                                    interactive: false
+                                    Layout.alignment: Qt.AlignRight
+                                    Layout.preferredWidth: implicitWidth
+                                    Layout.preferredHeight: 24
+                                    scale: vrrMouse.pressed ? 0.95 : (vrrMouse.containsMouse ? 1.05 : 1.0)
+                                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                                }
                             }
 
-                            Text {
-                                text: root.vrrEnabled ? "●" : "○"
-                                font.family: Theme.fontMono
-                                font.pixelSize: Theme.fontPx(14)
-                                color: root.vrrEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.35)
-                                Layout.alignment: Qt.AlignRight
-
-                                Behavior on color { ColorAnimation { duration: 150 } }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    anchors.margins: -8
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        root.vrrEnabled = !root.vrrEnabled
-                                        root.sendHub({ "module": "display", "action": "set_vrr", "state": root.vrrEnabled ? 1 : 0 })
-                                    }
+                            MouseArea {
+                                id: vrrMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.vrrEnabled = !root.vrrEnabled
+                                    root.sendHub({ "module": "display", "action": "set_vrr", "state": root.vrrEnabled ? 1 : 0 })
                                 }
                             }
                         }
 
-                        // Hardware Feature 2: 10-Bit Color Depth [ ● / ○ ]
-                        RowLayout {
+                        // Hardware Feature 2: 10-Bit Color Depth
+                        Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 30
+                            Layout.preferredHeight: 36
+                            radius: 8
+                            color: tenBitMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
 
-                            Text {
-                                text: "10-Bit Color Depth"
-                                font.family: Theme.font
-                                font.pixelSize: Theme.fontPx(13)
-                                font.weight: Font.Medium
-                                color: Qt.rgba(1, 1, 1, 0.85)
-                                Layout.fillWidth: true
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 8
+
+                                Text {
+                                    text: "10-Bit Color Depth"
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(12)
+                                    font.weight: Font.Medium
+                                    color: Qt.rgba(1, 1, 1, 0.85)
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+
+                                TerminalStatusBadge {
+                                    checked: root.tenBitEnabled
+                                    interactive: false
+                                    Layout.alignment: Qt.AlignRight
+                                    Layout.preferredWidth: implicitWidth
+                                    Layout.preferredHeight: 24
+                                    scale: tenBitMouse.pressed ? 0.95 : (tenBitMouse.containsMouse ? 1.05 : 1.0)
+                                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                                }
                             }
 
-                            Text {
-                                text: root.tenBitEnabled ? "●" : "○"
-                                font.family: Theme.fontMono
-                                font.pixelSize: Theme.fontPx(14)
-                                color: root.tenBitEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.35)
-                                Layout.alignment: Qt.AlignRight
-
-                                Behavior on color { ColorAnimation { duration: 150 } }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    anchors.margins: -8
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        root.tenBitEnabled = !root.tenBitEnabled
-                                        root.sendHub({ "module": "display", "action": "set_display_feature", "feature": "10bit", "value": root.tenBitEnabled })
-                                    }
+                            MouseArea {
+                                id: tenBitMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.tenBitEnabled = !root.tenBitEnabled
+                                    root.sendHub({ "module": "display", "action": "set_display_feature", "feature": "10bit", "value": root.tenBitEnabled })
                                 }
                             }
                         }
 
-                        // Hardware Feature 3: Direct Scanout [ ● / ○ ]
-                        RowLayout {
+                        // Hardware Feature 3: Direct Scanout
+                        Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 30
+                            Layout.preferredHeight: 36
+                            radius: 8
+                            color: directScanoutMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
 
-                            Text {
-                                text: "Direct Scanout"
-                                font.family: Theme.font
-                                font.pixelSize: Theme.fontPx(13)
-                                font.weight: Font.Medium
-                                color: Qt.rgba(1, 1, 1, 0.85)
-                                Layout.fillWidth: true
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 8
+
+                                Text {
+                                    text: "Direct Scanout"
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(12)
+                                    font.weight: Font.Medium
+                                    color: Qt.rgba(1, 1, 1, 0.85)
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+
+                                TerminalStatusBadge {
+                                    checked: root.directScanoutEnabled
+                                    interactive: false
+                                    Layout.alignment: Qt.AlignRight
+                                    Layout.preferredWidth: implicitWidth
+                                    Layout.preferredHeight: 24
+                                    scale: directScanoutMouse.pressed ? 0.95 : (directScanoutMouse.containsMouse ? 1.05 : 1.0)
+                                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                                }
                             }
 
-                            Text {
-                                text: root.directScanoutEnabled ? "●" : "○"
-                                font.family: Theme.fontMono
-                                font.pixelSize: Theme.fontPx(14)
-                                color: root.directScanoutEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.35)
-                                Layout.alignment: Qt.AlignRight
-
-                                Behavior on color { ColorAnimation { duration: 150 } }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    anchors.margins: -8
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        root.directScanoutEnabled = !root.directScanoutEnabled
-                                        root.sendHub({ "module": "display", "action": "set_display_feature", "feature": "direct_scanout", "value": root.directScanoutEnabled })
-                                    }
+                            MouseArea {
+                                id: directScanoutMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.directScanoutEnabled = !root.directScanoutEnabled
+                                    root.sendHub({ "module": "display", "action": "set_display_feature", "feature": "direct_scanout", "value": root.directScanoutEnabled })
                                 }
                             }
                         }
 
-                        // Hardware Feature 4: Mirror Display (Clone) [ ● / ○ ]
-                        RowLayout {
+                        // Hardware Feature 4: Mirror Display (Clone)
+                        Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 30
+                            Layout.preferredHeight: 36
+                            radius: 8
+                            color: mirrorMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent"
+                            Behavior on color { ColorAnimation { duration: 150 } }
 
-                            Text {
-                                text: "Mirror Display (Clone)"
-                                font.family: Theme.font
-                                font.pixelSize: Theme.fontPx(13)
-                                font.weight: Font.Medium
-                                color: Qt.rgba(1, 1, 1, 0.85)
-                                Layout.fillWidth: true
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 8
+
+                                Text {
+                                    text: "Mirror Display (Clone)"
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(12)
+                                    font.weight: Font.Medium
+                                    color: Qt.rgba(1, 1, 1, 0.85)
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+
+                                TerminalStatusBadge {
+                                    checked: root.mirrorEnabled
+                                    interactive: false
+                                    Layout.alignment: Qt.AlignRight
+                                    Layout.preferredWidth: implicitWidth
+                                    Layout.preferredHeight: 24
+                                    scale: mirrorMouse.pressed ? 0.95 : (mirrorMouse.containsMouse ? 1.05 : 1.0)
+                                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                                }
                             }
 
-                            Text {
-                                text: root.mirrorEnabled ? "●" : "○"
-                                font.family: Theme.fontMono
-                                font.pixelSize: Theme.fontPx(14)
-                                color: root.mirrorEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.35)
-                                Layout.alignment: Qt.AlignRight
-
-                                Behavior on color { ColorAnimation { duration: 150 } }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    anchors.margins: -8
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        root.mirrorEnabled = !root.mirrorEnabled
-                                        root.sendHub({ "module": "display", "action": "set_display_feature", "feature": "mirror", "value": root.mirrorEnabled })
-                                    }
+                            MouseArea {
+                                id: mirrorMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.mirrorEnabled = !root.mirrorEnabled
+                                    root.sendHub({ "module": "display", "action": "set_display_feature", "feature": "mirror", "value": root.mirrorEnabled })
                                 }
                             }
                         }

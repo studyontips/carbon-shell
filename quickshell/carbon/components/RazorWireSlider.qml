@@ -91,15 +91,20 @@ Item {
                 width: 10
                 height: 10
                 rotation: 45
+                radius: 2
                 color: Theme.surface
                 border.color: Theme.primary
                 border.width: 1.5
+
+                scale: mouseArea.containsPress ? 1.3 : (mouseArea.containsMouse ? 1.15 : 1.0)
+                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
                 // Subtle center dot or glow if dragged
                 Rectangle {
                     anchors.centerIn: parent
                     width: 3
                     height: 3
+                    radius: 1.5
                     color: Theme.primary
                     visible: mouseArea.containsPress
                 }
