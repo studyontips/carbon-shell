@@ -1,0 +1,615 @@
+export enum AppState {
+    Idle,
+    Uploading,
+    Success,
+}
+
+export component MainWindow inherits Window {
+    title: "Carbon Drop";
+    width: 640px;
+    height: 520px;
+    background: transparent;
+
+    in-out property <AppState> state: AppState.Idle;
+    in-out property <string> active_api: "0x0.st";
+    in-out property <float> upload_progress: 0.0;
+    in-out property <string> file_name: "";
+    in-out property <string> result_url: "";
+    in-out property <string> status_message: "";
+    in-out property <string> arc_path: "M 40 8 A 32 32 0 0 1 72 40";
+    in-out property <bool> is_drag_over: false;
+    in-out property <bool> is_paused: false;
+    in-out property <bool> link_copied: false;
+
+    callback select_api(string);
+    callback browse_clicked();
+    callback cancel_upload();
+    callback pause_toggle();
+    callback copy_link();
+    callback reset_state();
+    callback close_window();
+
+    // Main dark frosted glass container
+    main_card := Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: 16px;
+        background: #0a0b0e;
+        border-width: 1px;
+        border-color: #ffffff1a;
+        clip: true;
+
+        // Top Tactical Drag / Title Area
+        WindowMoveArea {
+            x: 0px;
+            y: 0px;
+            width: 100%;
+            height: 32px;
+
+            HorizontalLayout {
+                padding-left: 20px;
+                padding-right: 16px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: "CARBON // DROP";
+                        color: #ffffff77;
+                        font-size: 11px;
+                        font-weight: 700;
+                        letter-spacing: 1.5px;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Window Close button
+                close_btn := Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: close_touch.has-hover ? #ff555533 : transparent;
+
+                    close_touch := TouchArea {
+                        clicked => {
+                            root.close_window();
+                        }
+                    }
+
+                    Text {
+                        text: "✕";
+                        color: close_touch.has-hover ? #ff5555 : #ffffff44;
+                        font-size: 12px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // TOP 70%: THE TACTICAL DROP ZONE (592x312)
+        // ==========================================
+        drop_zone := Rectangle {
+            x: 24px;
+            y: 32px;
+            width: 592px;
+            height: 312px;
+            border-radius: 12px;
+            clip: true;
+
+            // Background faint dots pattern
+            Image {
+                width: 100%;
+                height: 100%;
+                source: @image-url("assets/dots.svg");
+            }
+
+            // Tactical Dashed border
+            Image {
+                width: 100%;
+                height: 100%;
+                source: (root.is_drag_over || drop_touch.has-hover)
+                    ? @image-url("assets/dashed_border_active.svg")
+                    : @image-url("assets/dashed_border.svg");
+            }
+
+            // Click touch area for Idle state
+            drop_touch := TouchArea {
+                enabled: root.state == AppState.Idle;
+                clicked => {
+                    root.browse_clicked();
+                }
+            }
+
+            // STATE OVERLAYS
+            // 1. Idle Overlay
+            if root.state == AppState.Idle : VerticalLayout {
+                alignment: center;
+                spacing: 10px;
+
+                Text {
+                    text: "◇";
+                    color: (root.is_drag_over || drop_touch.has-hover) ? #00f0ff : #ffffff66;
+                    font-size: 32px;
+                    horizontal-alignment: center;
+                    animate color { duration: 150ms; }
+                }
+
+                Text {
+                    text: "DRAG & DROP FILE";
+                    color: (root.is_drag_over || drop_touch.has-hover) ? #ffffff : #ffffff99;
+                    font-size: 15px;
+                    font-weight: 700;
+                    letter-spacing: 2px;
+                    horizontal-alignment: center;
+                    animate color { duration: 150ms; }
+                }
+
+                Text {
+                    text: "or click anywhere in the zone to browse";
+                    color: #ffffff44;
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                }
+
+                if root.status_message != "" : Text {
+                    text: root.status_message;
+                    color: #f38ba8;
+                    font-size: 11px;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                }
+            }
+
+            // 2. Uploading Overlay
+            if root.state == AppState.Uploading : VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+
+                // Circular Progress Ring
+                HorizontalLayout {
+                    alignment: center;
+
+                    Rectangle {
+                        width: 80px;
+                        height: 80px;
+
+                        // Ring background track
+                        Path {
+                            width: 80px;
+                            height: 80px;
+                            commands: "M 40 8 A 32 32 0 1 1 39.99 8";
+                            stroke: #ffffff18;
+                            stroke-width: 5px;
+                        }
+
+                        // Ring active cyan arc
+                        Path {
+                            width: 80px;
+                            height: 80px;
+                            commands: root.arc_path;
+                            stroke: #00f0ff;
+                            stroke-width: 5px;
+                        }
+
+                        // Percentage inside ring
+                        Text {
+                            text: (Math.round(root.upload_progress * 100)) + "%";
+                            color: #00f0ff;
+                            font-size: 15px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                Text {
+                    text: "Uploading to " + root.active_api + "... " + (Math.round(root.upload_progress * 100)) + "%";
+                    color: #ffffffcc;
+                    font-size: 14px;
+                    font-weight: 600;
+                    letter-spacing: 0.5px;
+                    horizontal-alignment: center;
+                }
+
+                if root.file_name != "" : Text {
+                    text: root.file_name;
+                    color: #ffffff66;
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                    overflow: elide;
+                    max-width: 450px;
+                }
+            }
+
+            // 3. Success Overlay
+            if root.state == AppState.Success : VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+
+                HorizontalLayout {
+                    alignment: center;
+
+                    Image {
+                        width: 52px;
+                        height: 52px;
+                        source: @image-url("assets/check.svg");
+                    }
+                }
+
+                Text {
+                    text: "Upload Complete";
+                    color: #22c55e;
+                    font-size: 18px;
+                    font-weight: 700;
+                    letter-spacing: 0.5px;
+                    horizontal-alignment: center;
+                }
+
+                if root.file_name != "" : Text {
+                    text: root.file_name;
+                    color: #ffffff77;
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                    overflow: elide;
+                    max-width: 450px;
+                }
+            }
+        }
+
+        // ==========================================
+        // 1px Horizontal Hairline Divider
+        // ==========================================
+        Rectangle {
+            x: 24px;
+            y: 360px;
+            width: 592px;
+            height: 1px;
+            background: #ffffff16;
+        }
+
+        // ==========================================
+        // BOTTOM 30%: THE CONTROL DECK
+        // ==========================================
+        control_deck := Rectangle {
+            x: 24px;
+            y: 374px;
+            width: 592px;
+            height: 122px;
+
+            VerticalLayout {
+                width: 100%;
+                height: 100%;
+                alignment: space-between;
+
+                // TOP ROW: API Switcher Pill
+                HorizontalLayout {
+                    alignment: center;
+
+                Rectangle {
+                    width: 380px;
+                    height: 38px;
+                    border-radius: 19px;
+                    background: #ffffff0a;
+                    border-width: 1px;
+                    border-color: #ffffff14;
+
+                    HorizontalLayout {
+                        alignment: space-around;
+                        padding-left: 8px;
+                        padding-right: 8px;
+
+                        // API 1: 0x0.st
+                        api_0x0 := Rectangle {
+                            height: 30px;
+                            border-radius: 15px;
+                            background: root.active_api == "0x0.st" ? #00f0ff22 : (api_0x0_touch.has-hover ? #ffffff0d : transparent);
+                            border-width: root.active_api == "0x0.st" ? 1px : 0px;
+                            border-color: #00f0ff55;
+                            api_0x0_touch := TouchArea {
+                                clicked => {
+                                    root.select_api("0x0.st");
+                                }
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                alignment: center;
+                                Text {
+                                    text: (root.active_api == "0x0.st" ? "◆" : "◇") + " 0x0.st";
+                                    color: root.active_api == "0x0.st" ? #00f0ff : #ffffff88;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                    horizontal-alignment: center;
+                                }
+                            }
+                        }
+
+                        // Divider 1
+                        Text {
+                            text: "|";
+                            color: #ffffff22;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+
+                        // API 2: Litterbox
+                        api_litterbox := Rectangle {
+                            height: 30px;
+                            border-radius: 15px;
+                            background: root.active_api == "Litterbox" ? #00f0ff22 : (api_lit_touch.has-hover ? #ffffff0d : transparent);
+                            border-width: root.active_api == "Litterbox" ? 1px : 0px;
+                            border-color: #00f0ff55;
+
+                            api_lit_touch := TouchArea {
+                                clicked => {
+                                    root.select_api("Litterbox");
+                                }
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                alignment: center;
+                                Text {
+                                    text: (root.active_api == "Litterbox" ? "◆" : "◇") + " Litterbox";
+                                    color: root.active_api == "Litterbox" ? #00f0ff : #ffffff88;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                    horizontal-alignment: center;
+                                }
+                            }
+                        }
+
+                        // Divider 2
+                        Text {
+                            text: "|";
+                            color: #ffffff22;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+
+                        // API 3: file.io
+                        api_fileio := Rectangle {
+                            height: 30px;
+                            border-radius: 15px;
+                            background: root.active_api == "file.io" ? #00f0ff22 : (api_fileio_touch.has-hover ? #ffffff0d : transparent);
+                            border-width: root.active_api == "file.io" ? 1px : 0px;
+                            border-color: #00f0ff55;
+
+                            api_fileio_touch := TouchArea {
+                                clicked => {
+                                    root.select_api("file.io");
+                                }
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                alignment: center;
+                                Text {
+                                    text: (root.active_api == "file.io" ? "◆" : "◇") + " file.io";
+                                    color: root.active_api == "file.io" ? #00f0ff : #ffffff88;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                    horizontal-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+            // BOTTOM ROW: Contextual Actions
+            HorizontalLayout {
+                width: 100%;
+                height: 48px;
+                alignment: space-between;
+
+                // === STATE: IDLE ===
+                if root.state == AppState.Idle : HorizontalLayout {
+                    width: 100%;
+                    alignment: space-between;
+
+                    Text {
+                        text: "Max file size: 512MB";
+                        color: #ffffff55;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle {
+                        width: 130px;
+                        height: 36px;
+                        border-radius: 8px;
+                        background: browse_touch.has-hover ? #ffffff1a : #ffffff0d;
+                        border-width: 1px;
+                        border-color: browse_touch.has-hover ? #00f0ff66 : #ffffff18;
+
+                        browse_touch := TouchArea {
+                            clicked => {
+                                root.browse_clicked();
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 6px;
+                            Text {
+                                text: "📁";
+                                font-size: 13px;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: "Browse Files";
+                                color: #ffffffdd;
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // === STATE: UPLOADING ===
+                if root.state == AppState.Uploading : HorizontalLayout {
+                    width: 100%;
+                    alignment: space-between;
+
+                    // Left status / rate
+                    Text {
+                        text: root.is_paused ? "Upload Paused" : (root.status_message != "" ? root.status_message : "Transferring data...");
+                        color: root.is_paused ? #e5c07b : #ffffff77;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: end;
+
+                        // [ || PAUSE ]
+                        pause_btn := Rectangle {
+                            width: 100px;
+                            height: 36px;
+                            border-radius: 8px;
+                            background: pause_touch.has-hover ? #ffffff18 : #ffffff0a;
+                            border-width: 1px;
+                            border-color: #ffffff20;
+
+                            pause_touch := TouchArea {
+                                clicked => {
+                                    root.pause_toggle();
+                                }
+                            }
+
+                            Text {
+                                text: root.is_paused ? "▶ RESUME" : "|| PAUSE";
+                                color: root.is_paused ? #e5c07b : #ffffffcc;
+                                font-size: 12px;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        // [ ✕ CANCEL ] - Glows red on hover
+                        cancel_btn := Rectangle {
+                            width: 104px;
+                            height: 36px;
+                            border-radius: 8px;
+                            background: cancel_touch.has-hover ? #f38ba833 : #ffffff0a;
+                            border-width: 1px;
+                            border-color: cancel_touch.has-hover ? #f38ba8 : #ffffff20;
+                            animate background { duration: 120ms; }
+                            animate border-color { duration: 120ms; }
+
+                            cancel_touch := TouchArea {
+                                clicked => {
+                                    root.cancel_upload();
+                                }
+                            }
+
+                            Text {
+                                text: "✕ CANCEL";
+                                color: cancel_touch.has-hover ? #f38ba8 : #ffffffcc;
+                                font-size: 12px;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                animate color { duration: 120ms; }
+                            }
+                        }
+                    }
+                }
+
+                // === STATE: SUCCESS ===
+                if root.state == AppState.Success : HorizontalLayout {
+                    width: 100%;
+                    alignment: space-between;
+                    spacing: 10px;
+
+                    // URL TextInput / Selectable box
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 38px;
+                        border-radius: 8px;
+                        background: #00000088;
+                        border-width: 1px;
+                        border-color: #ffffff22;
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            TextInput {
+                                text: root.result_url;
+                                color: #56d4ff;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                                read-only: true;
+                            }
+                        }
+                    }
+
+                    // [ ⧉ COPY LINK ] Button
+                    copy_btn := Rectangle {
+                        width: 124px;
+                        height: 38px;
+                        border-radius: 8px;
+                        background: root.link_copied ? #22c55e : (copy_touch.has-hover ? #00f0ff : #00f0ffcc);
+                        border-width: 1px;
+                        border-color: root.link_copied ? #22c55e : #00f0ff;
+                        animate background { duration: 120ms; }
+
+                        copy_touch := TouchArea {
+                            clicked => {
+                                root.copy_link();
+                            }
+                        }
+
+                        Text {
+                            text: root.link_copied ? "✓ COPIED" : "⧉ COPY LINK";
+                            color: #0a0b0e;
+                            font-size: 12px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // Reset / New Upload Button
+                    new_btn := Rectangle {
+                        width: 80px;
+                        height: 38px;
+                        border-radius: 8px;
+                        background: new_touch.has-hover ? #ffffff1a : #ffffff0a;
+                        border-width: 1px;
+                        border-color: #ffffff20;
+
+                        new_touch := TouchArea {
+                            clicked => {
+                                root.reset_state();
+                            }
+                        }
+
+                        Text {
+                            text: "+ NEW";
+                            color: #ffffffcc;
+                            font-size: 12px;
+                            font-weight: 600;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+}
