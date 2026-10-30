@@ -12,7 +12,7 @@ Item {
     property bool open: false
     signal closeRequested()
 
-    property string currentSection: "Appearance"
+    property string currentSection: "Display"
 
     // Backdrop dismissal
     MouseArea {
@@ -24,12 +24,12 @@ Item {
     Rectangle {
         id: hubWindow
         anchors.centerIn: parent
-        width: Math.min(parent.width - 64, 1060)
-        height: Math.min(parent.height - 64, 680)
+        width: Math.min(parent.width - 32, Math.round(1060 * Theme.shellScale))
+        height: Math.min(parent.height - 32, Math.round(680 * Theme.shellScale))
         color: Theme.surface
         border.color: Qt.rgba(1, 1, 1, 0.12)
         border.width: 1
-        radius: 12
+        radius: Theme.px(12)
         clip: true
 
         // Stop propagation so clicking inside window doesn't close
@@ -45,16 +45,16 @@ Item {
             // Header Bar
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 52
+                Layout.preferredHeight: Theme.px(52)
                 color: Qt.rgba(0, 0, 0, 0.20)
                 border.color: Qt.rgba(1, 1, 1, 0.08)
                 border.width: 1
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 20
-                    anchors.rightMargin: 16
-                    spacing: 12
+                    anchors.leftMargin: Theme.px(20)
+                    anchors.rightMargin: Theme.px(16)
+                    spacing: Theme.px(12)
 
                     Text {
                         text: "CARBON // SETTINGS HUB"
@@ -68,9 +68,9 @@ Item {
 
                     // Close Button
                     Rectangle {
-                        Layout.preferredWidth: 28
-                        Layout.preferredHeight: 28
-                        radius: 6
+                        Layout.preferredWidth: Theme.px(28)
+                        Layout.preferredHeight: Theme.px(28)
+                        radius: Theme.px(6)
                         color: closeMouse.pressed ? Qt.rgba(1, 1, 1, 0.15) : (closeMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent")
                         border.color: closeMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.20) : "transparent"
                         border.width: 1
@@ -104,7 +104,7 @@ Item {
                 // SIDEBAR with subtle tactile hardware pattern
                 // ==========================================
                 Item {
-                    Layout.preferredWidth: 210
+                    Layout.preferredWidth: Theme.px(210)
                     Layout.fillHeight: true
 
                     // Tactile Textured Background: 45-degree etch lines / dot-matrix
@@ -129,10 +129,10 @@ Item {
                     // Sidebar Navigation Items
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.topMargin: 16
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-                        spacing: 4
+                        anchors.topMargin: Theme.px(16)
+                        anchors.leftMargin: Theme.px(12)
+                        anchors.rightMargin: Theme.px(12)
+                        spacing: Theme.px(4)
 
                         Repeater {
                             model: [
@@ -145,17 +145,17 @@ Item {
 
                             delegate: Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 38
-                                radius: 6
+                                Layout.preferredHeight: Theme.px(38)
+                                radius: Theme.px(6)
                                 color: (root.currentSection === modelData.name) ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.12) : (navMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent")
                                 border.color: (root.currentSection === modelData.name) ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40) : "transparent"
                                 border.width: 1
 
                                 RowLayout {
                                     anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
-                                    spacing: 10
+                                    anchors.leftMargin: Theme.px(12)
+                                    anchors.rightMargin: Theme.px(12)
+                                    spacing: Theme.px(10)
 
                                     Text {
                                         text: modelData.glyph

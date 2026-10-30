@@ -28,13 +28,13 @@ Item {
     readonly property bool hovered: (rootHover && rootHover.hovered) || (mainCardHover && mainCardHover.hovered)
     signal closeRequested()
 
-    implicitWidth: 820
-    implicitHeight: 270
+    implicitWidth: Theme.px(820)
+    implicitHeight: Theme.px(270)
     width: implicitWidth
     height: implicitHeight
     clip: false
-    property real earRadius: 16
-    property real bottomRadius: 20
+    property real earRadius: Theme.px(16)
+    property real bottomRadius: Theme.px(20)
 
     focus: root.open
     Keys.enabled: root.open
@@ -117,10 +117,10 @@ Item {
                 strokeWidth: 0
                 startX: 0; startY: 0
                 PathLine { x: mainCard.width; y: 0 }
-                PathLine { x: mainCard.width; y: mainCard.height - 20 }
-                PathArc { x: mainCard.width - 20; y: mainCard.height; radiusX: 20; radiusY: 20 }
-                PathLine { x: 20; y: mainCard.height }
-                PathArc { x: 0; y: mainCard.height - 20; radiusX: 20; radiusY: 20 }
+                PathLine { x: mainCard.width; y: mainCard.height - root.bottomRadius }
+                PathArc { x: mainCard.width - root.bottomRadius; y: mainCard.height; radiusX: root.bottomRadius; radiusY: root.bottomRadius }
+                PathLine { x: root.bottomRadius; y: mainCard.height }
+                PathArc { x: 0; y: mainCard.height - root.bottomRadius; radiusX: root.bottomRadius; radiusY: root.bottomRadius }
                 PathLine { x: 0; y: 0 }
             }
         }
@@ -128,8 +128,8 @@ Item {
         /* ── 3-Column Layout ─────────────────────────────────────────────── */
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 14
-            spacing: 12
+            anchors.margins: Theme.px(14)
+            spacing: Theme.px(12)
             z: 1
 
             /* ============================================================= */
@@ -137,7 +137,7 @@ Item {
             /* ============================================================= */
             Item {
                 id: timelineCol
-                Layout.preferredWidth: 240
+                Layout.preferredWidth: Theme.px(240)
                 Layout.fillHeight: true
                 clip: true
 
@@ -159,7 +159,7 @@ Item {
             Item {
                 id: centerCol
                 Layout.fillWidth: true
-                Layout.preferredWidth: 288
+                Layout.preferredWidth: Theme.px(288)
                 Layout.fillHeight: true
                 clip: true
 
@@ -182,19 +182,19 @@ Item {
             /* ============================================================= */
             Item {
                 id: rightCol
-                Layout.preferredWidth: 240
+                Layout.preferredWidth: Theme.px(240)
                 Layout.fillHeight: true
 
                 property string viewMode: "lyrics"
 
                 ColumnLayout {
                     anchors.fill: parent
-                    spacing: 8
+                    spacing: Theme.px(8)
 
                     // Header: Clean Track Title, Artist & Album Art (Zero "LRC // SYNC" clutter)
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 8
+                        spacing: Theme.px(8)
 
                         // Track Title & Artist (Clean left aligned)
                         ColumnLayout {
@@ -224,9 +224,9 @@ Item {
 
                         // Rounded Album Art Square
                         Rectangle {
-                            width: 30
-                            height: 30
-                            radius: 8
+                            width: Theme.px(30)
+                            height: Theme.px(30)
+                            radius: Theme.px(8)
                             color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.90)
                             border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
                             border.width: 1

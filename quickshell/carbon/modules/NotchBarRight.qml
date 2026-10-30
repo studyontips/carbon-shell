@@ -97,14 +97,14 @@ NotchContainer {
         /* 1. Wi-Fi Status Badge */
         Item {
             id: wifiBadge
-            width: 24
-            height: 24
+            width: Theme.px(24)
+            height: Theme.px(24)
             anchors.verticalCenter: parent.verticalCenter
             readonly property bool isHovered: wifiMouse.containsMouse
 
             Rectangle {
                 anchors.fill: parent
-                radius: 6
+                radius: Theme.px(6)
                 color: "transparent"
                 border.color: wifiBadge.isHovered ? Theme.accent : "transparent"
                 border.width: 1
@@ -115,7 +115,7 @@ NotchContainer {
                 anchors.centerIn: parent
                 text: root.wifiGlyph
                 font.family: "JetBrainsMono Nerd Font"
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontPx(15)
                 color: root.wifiConnected ? (wifiBadge.isHovered ? Theme.accentLit : Theme.accent) : Theme.fgDim
             }
 
@@ -131,14 +131,14 @@ NotchContainer {
         /* 2. Volume Status Badge (Scroll wheel to adjust volume, right click to mute) */
         Item {
             id: volumeBadge
-            width: 24
-            height: 24
+            width: Theme.px(24)
+            height: Theme.px(24)
             anchors.verticalCenter: parent.verticalCenter
             readonly property bool isHovered: volMouse.containsMouse
 
             Rectangle {
                 anchors.fill: parent
-                radius: 6
+                radius: Theme.px(6)
                 color: "transparent"
                 border.color: volumeBadge.isHovered ? Theme.accent : "transparent"
                 border.width: 1
@@ -149,7 +149,7 @@ NotchContainer {
                 anchors.centerIn: parent
                 text: root.volumeGlyph
                 font.family: "JetBrainsMono Nerd Font"
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontPx(15)
                 color: root.muted ? Theme.fgDim : (volumeBadge.isHovered ? Theme.accentLit : Theme.fg)
             }
 
@@ -184,14 +184,14 @@ NotchContainer {
         Item {
             id: batteryBadge
             visible: root.hasBattery
-            width: 24
-            height: 24
+            width: Theme.px(24)
+            height: Theme.px(24)
             anchors.verticalCenter: parent.verticalCenter
             readonly property bool isHovered: batMouse.containsMouse
 
             Rectangle {
                 anchors.fill: parent
-                radius: 6
+                radius: Theme.px(6)
                 color: "transparent"
                 border.color: batteryBadge.isHovered ? Theme.accent : "transparent"
                 border.width: 1
@@ -202,7 +202,7 @@ NotchContainer {
                 anchors.centerIn: parent
                 text: root.batteryGlyph
                 font.family: "JetBrainsMono Nerd Font"
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontPx(15)
                 color: root.isCharging ? Theme.accent : (root.batteryPct < 0.2 ? Theme.err : Theme.fg)
             }
 
@@ -218,15 +218,15 @@ NotchContainer {
         /* 4. System Tray Overflow: Chevron */
         Item {
             id: trayBadge
-            width: 22
-            height: 22
+            width: Theme.px(22)
+            height: Theme.px(22)
             anchors.verticalCenter: parent.verticalCenter
             visible: true
             readonly property bool isHovered: trayMouse.containsMouse
 
             Rectangle {
                 anchors.fill: parent
-                radius: 6
+                radius: Theme.px(6)
                 color: "transparent"
                 border.color: trayBadge.isHovered ? Theme.accent : "transparent"
                 border.width: 1
@@ -237,7 +237,7 @@ NotchContainer {
                 anchors.centerIn: parent
                 text: "󰅀"
                 font.family: "JetBrainsMono Nerd Font"
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontPx(15)
                 color: trayBadge.isHovered ? Theme.accent : Theme.fg
             }
 
@@ -253,14 +253,14 @@ NotchContainer {
         /* 5. Power Menu Button */
         Item {
             id: pwrBadge
-            width: 24
-            height: 24
+            width: Theme.px(24)
+            height: Theme.px(24)
             anchors.verticalCenter: parent.verticalCenter
             readonly property bool isHovered: pwrMouse.containsMouse
 
             Rectangle {
                 anchors.fill: parent
-                radius: 6
+                radius: Theme.px(6)
                 color: "transparent"
                 border.color: pwrBadge.isHovered ? Theme.err : "transparent"
                 border.width: 1
@@ -271,7 +271,7 @@ NotchContainer {
                 anchors.centerIn: parent
                 text: "󰐥"
                 font.family: "JetBrainsMono Nerd Font"
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontPx(15)
                 color: pwrBadge.isHovered ? Theme.err : Theme.fgDim
             }
 

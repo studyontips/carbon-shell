@@ -13,16 +13,16 @@ Item {
 
     property bool leftFillet: true
     property bool rightFillet: true
-    property real filletRadius: 10
-    property real bottomRadius: 14
-    property real contentSpacing: 7
-    property real horizontalPadding: 12
+    property real filletRadius: Math.round(10 * (Theme && Theme.shellScale !== undefined ? Theme.shellScale : 1.0))
+    property real bottomRadius: Math.round(14 * (Theme && Theme.shellScale !== undefined ? Theme.shellScale : 1.0))
+    property real contentSpacing: Math.round(7 * (Theme && Theme.shellScale !== undefined ? Theme.shellScale : 1.0))
+    property real horizontalPadding: Math.round(12 * (Theme && Theme.shellScale !== undefined ? Theme.shellScale : 1.0))
     property real earWidth: 0
 
     default property alias content: contentRow.data
     readonly property real contentImplicitWidth: contentRow.implicitWidth
 
-    implicitHeight: 32
+    implicitHeight: Math.round(34 * (Theme && Theme.shellScale !== undefined ? Theme.shellScale : 1.0))
     implicitWidth: Math.max(70, contentRow.implicitWidth 
                    + (leftFillet ? filletRadius : 0) 
                    + (rightFillet ? filletRadius : 0) 

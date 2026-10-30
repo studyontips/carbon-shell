@@ -59,7 +59,10 @@ Singleton {
         watchChanges: true
         blockLoading: true
         printErrors: false
-        onFileChanged: root.reloadShellOpacity()
+        onFileChanged: {
+            reload()
+            root.reloadShellOpacity()
+        }
         onLoaded: root.reloadShellOpacity()
     }
 
@@ -70,6 +73,11 @@ Singleton {
                 var d = JSON.parse(txt)
                 if (d.shellOpacity !== undefined) {
                     root.shellOpacity = Math.max(0.10, Math.min(1.0, parseFloat(d.shellOpacity) || 0.85))
+                }
+                if (d.scale !== undefined) {
+                    var s = Math.max(0.75, Math.min(1.50, parseFloat(d.scale) || 1.0))
+                    root.shellScale = s
+                    root.fontScale = s
                 }
             }
         } catch (e) {}
@@ -470,21 +478,21 @@ Singleton {
     }
 
     /* Bar geometry */
-    readonly property real barWidth: 56
-    readonly property real radius: 18
-    readonly property real iconSize: 22
-    readonly property real moduleMargin: 5
+    readonly property real barWidth: Math.round(56 * shellScale)
+    readonly property real radius: Math.round(18 * shellScale)
+    readonly property real iconSize: Math.round(22 * shellScale)
+    readonly property real moduleMargin: Math.round(5 * shellScale)
 
     /* Typography */
     readonly property string font: "Plus Jakarta Sans"
     readonly property string fontFamily: "Plus Jakarta Sans"
     readonly property string fontMono: "JetBrainsMono Nerd Font"
 
-    /* ── Global Font Scale — the single knob ────────────────────────── */
-    // Edit this ONE number to resize every text element in the shell.
-    // 1.0 = original design size.  All text sizes are wrapped in fontPx().
-    readonly property real fontScale: 1
+    /* ── Global Font & Shell Scale ──────────────────────────────────── */
+    property real fontScale: 1.0
+    property real shellScale: 1.0
     function fontPx(base) { return Math.round(base * fontScale) }
+    function px(base) { return Math.round(base * shellScale) }
     readonly property string fontIcon: "Material Symbols Rounded"
 
     /* ── Material Design 3 Motion System ───────────────────────────── */

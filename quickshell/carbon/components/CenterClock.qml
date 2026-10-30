@@ -104,7 +104,7 @@ Item {
     Component {
         id: compTitan
         Row {
-            spacing: 2
+            spacing: Theme.px(2)
 
             Text {
                 text: root.hourStr
@@ -136,17 +136,17 @@ Item {
     Component {
         id: compStacked
         Row {
-            spacing: 6
+            spacing: Theme.px(6)
 
             Rectangle {
-                width: 3
-                height: 22
-                radius: 1.5
+                width: Math.max(1, Theme.px(3))
+                height: Theme.px(22)
+                radius: Theme.px(1.5)
                 color: Theme.accent
             }
 
             Column {
-                spacing: -5
+                spacing: -Theme.px(5)
 
                 Text {
                     text: root.hourStr
@@ -171,7 +171,7 @@ Item {
     Component {
         id: compMonoGlow
         Row {
-            spacing: 5
+            spacing: Theme.px(5)
 
             Text {
                 text: root.hourStr
@@ -182,9 +182,9 @@ Item {
             }
 
             Rectangle {
-                width: 4
-                height: 4
-                radius: 2
+                width: Theme.px(4)
+                height: Theme.px(4)
+                radius: Theme.px(2)
                 anchors.verticalCenter: parent.verticalCenter
                 color: Theme.accentLit
             }
@@ -203,12 +203,12 @@ Item {
     Component {
         id: compSplitPill
         Row {
-            spacing: 5
+            spacing: Theme.px(5)
 
             Rectangle {
-                width: 26
-                height: 22
-                radius: 6
+                width: Theme.px(26)
+                height: Theme.px(22)
+                radius: Theme.px(6)
                 color: Qt.alpha(Theme.fg, 0.09)
                 border.color: Qt.alpha(Theme.accent, 0.35)
                 border.width: 1
@@ -232,9 +232,9 @@ Item {
             }
 
             Rectangle {
-                width: 26
-                height: 22
-                radius: 6
+                width: Theme.px(26)
+                height: Theme.px(22)
+                radius: Theme.px(6)
                 color: Qt.alpha(Theme.accent, 0.16)
                 border.color: Theme.accent
                 border.width: 1
@@ -255,7 +255,7 @@ Item {
     Component {
         id: compOrbitron
         Row {
-            spacing: 3
+            spacing: Theme.px(3)
 
             Text {
                 text: "["
@@ -303,11 +303,11 @@ Item {
     Component {
         id: compMinimalPill
         Rectangle {
-            height: 22
-            width: aeroRow.implicitWidth + 16
-            implicitHeight: 22
+            height: Theme.px(22)
+            width: aeroRow.implicitWidth + Theme.px(16)
+            implicitHeight: Theme.px(22)
             implicitWidth: width
-            radius: 11
+            radius: Theme.px(11)
             color: Qt.alpha(Theme.fg, 0.08)
             border.color: Qt.alpha(Theme.accent, 0.4)
             border.width: 1
@@ -315,7 +315,7 @@ Item {
             Row {
                 id: aeroRow
                 anchors.centerIn: parent
-                spacing: 2
+                spacing: Theme.px(2)
 
                 Text {
                     text: root.hourStr

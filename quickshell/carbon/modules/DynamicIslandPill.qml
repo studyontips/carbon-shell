@@ -10,18 +10,18 @@ import "../Singletons"
 Item {
     id: root
 
-    implicitHeight: 26
+    implicitHeight: Theme.px(26)
     implicitWidth: mainRow.implicitWidth
 
     Row {
         id: mainRow
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 10
+        spacing: Theme.px(10)
 
         /* ── Volume & Brightness HUD ─────────────────────────────────── */
         Row {
             id: sliderHud
-            spacing: 8
+            spacing: Theme.px(8)
             anchors.verticalCenter: parent.verticalCenter
             visible: HudService.mode === "volume" || HudService.mode === "brightness"
 
@@ -29,16 +29,16 @@ Item {
                 id: iconText
                 anchors.verticalCenter: parent.verticalCenter
                 font.family: Theme.fontIcon
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontPx(15)
                 color: HudService.muted ? Theme.error : Theme.accent
                 text: HudService.icon
             }
 
             Rectangle {
                 id: trackBg
-                width: 90
-                height: 5
-                radius: 2.5
+                width: Theme.px(90)
+                height: Theme.px(5)
+                radius: Theme.px(2.5)
                 color: Qt.alpha(Theme.fg, 0.15)
                 anchors.verticalCenter: parent.verticalCenter
                 clip: true
@@ -47,7 +47,7 @@ Item {
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left
-                    radius: 2.5
+                    radius: Theme.px(2.5)
                     width: Math.max(0, Math.min(parent.width, parent.width * (HudService.muted ? 0 : HudService.value)))
 
                     gradient: Gradient {
@@ -81,14 +81,14 @@ Item {
         /* ── Track Change HUD ─────────────────────────────────────────── */
         Row {
             id: trackHud
-            spacing: 8
+            spacing: Theme.px(8)
             anchors.verticalCenter: parent.verticalCenter
             visible: HudService.mode === "track"
 
             Rectangle {
-                width: 20
-                height: 20
-                radius: 10
+                width: Theme.px(20)
+                height: Theme.px(20)
+                radius: Theme.px(10)
                 color: Theme.bgAlt
                 border.color: Theme.accent
                 border.width: 1
@@ -98,7 +98,7 @@ Item {
                 Image {
                     anchors.fill: parent
                     source: HudService.artUrl
-                    sourceSize: Qt.size(40, 40)
+                    sourceSize: Qt.size(Theme.px(40), Theme.px(40))
                     visible: HudService.artUrl.length > 0
                     fillMode: Image.PreserveAspectCrop
                 }
@@ -108,7 +108,7 @@ Item {
                     visible: HudService.artUrl.length === 0
                     text: "music_note"
                     font.family: Theme.fontIcon
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fontPx(13)
                     color: Theme.accent
                 }
             }
@@ -132,7 +132,7 @@ Item {
                     font.weight: Font.Bold
                     color: Theme.fg
                     elide: Text.ElideRight
-                    width: Math.min(implicitWidth, 140)
+                    width: Math.min(implicitWidth, Theme.px(140))
                 }
             }
         }
@@ -140,14 +140,14 @@ Item {
         /* ── Battery / Power HUD ──────────────────────────────────────── */
         Row {
             id: batteryHud
-            spacing: 8
+            spacing: Theme.px(8)
             anchors.verticalCenter: parent.verticalCenter
             visible: HudService.mode === "battery"
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 font.family: Theme.fontIcon
-                font.pixelSize: 15
+                font.pixelSize: Theme.fontPx(15)
                 color: Theme.accent
                 text: HudService.icon
             }

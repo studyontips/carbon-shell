@@ -12,7 +12,7 @@ Item {
     implicitWidth: 800
     implicitHeight: 600
 
-    property string selectedMonitor: "eDP-1"
+    property string selectedMonitor: "DP-1"
     property var monitorsList: []
     
     // Active monitor properties
@@ -26,11 +26,11 @@ Item {
     property int dp1Width: 1920
     property int dp1Height: 1080
     property real dp1Rate: 120.0
-    property int dp1Transform: 0
+    property int dp1Transform: 1
     property real dp1Scale: 1.0
 
     // Global & Hardware states
-    property real globalShellScale: 1.0
+    property real globalShellScale: (Theme && Theme.shellScale !== undefined) ? Theme.shellScale : 1.0
     property int colorTemp: 6500
     property bool vrrEnabled: false
     property bool tenBitEnabled: false
@@ -48,6 +48,7 @@ Item {
         onConnectedChanged: {
             if (connected) {
                 root.sendHub({ "module": "display", "action": "get_monitors" })
+                root.sendHub({ "module": "display", "action": "get_shell_scale" })
             }
         }
 
@@ -75,6 +76,10 @@ Item {
                                         break
                                     }
                                 }
+                            }
+                        } else if (resp.action === "get_shell_scale" || resp.action === "set_shell_scale") {
+                            if (resp.data && resp.data.scale !== undefined) {
+                                root.globalShellScale = resp.data.scale
                             }
                         } else if (resp.action === "set_orientation") {
                             if (resp.data && resp.data.transform !== undefined) {
@@ -135,6 +140,49 @@ Item {
     }
 
     Timer {
+        id: shellScaleDebounce
+        interval: 100
+        repeat: false
+        onTriggered: {
+            root.sendHub({ "module": "display", "action": "set_shell_scale", "scale": root.globalShellScale })
+            if (Theme) {
+                Theme.shellScale = root.globalShellScale
+                Theme.fontScale = root.globalShellScale
+            }
+        }
+    }
+    function queueShellScale(val) {
+        root.globalShellScale = val
+        shellScaleDebounce.restart()
+    }
+
+    FileView {
+        id: barPosFile
+        path: (Quickshell.env("HOME") || "") + "/.config/carbon/carbon-bar-position.json"
+        watchChanges: true
+        blockLoading: true
+        printErrors: false
+        onLoaded: root.readShellScale()
+        onFileChanged: {
+            reload()
+            root.readShellScale()
+        }
+    }
+
+    function readShellScale() {
+        try {
+            var txt = barPosFile.text().trim()
+            if (txt.length > 0) {
+                var d = JSON.parse(txt)
+                if (d.scale !== undefined) {
+                    var s = Math.max(0.75, Math.min(1.50, parseFloat(d.scale) || 1.0))
+                    root.globalShellScale = s
+                }
+            }
+        } catch (e) {}
+    }
+
+    Timer {
         id: tempDebounce
         interval: 32
         repeat: false
@@ -147,6 +195,7 @@ Item {
 
     Component.onCompleted: {
         root.sendHub({ "module": "display", "action": "get_monitors" })
+        root.sendHub({ "module": "display", "action": "get_shell_scale" })
     }
 
     ColumnLayout {
@@ -158,7 +207,9 @@ Item {
         // ===================================================================
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 230
+            Layout.preferredHeight: 280
+            Layout.minimumHeight: 260
+            clip: true
 
             // Inset Card Container with Rounded Corners & Clip to prevent bleeding
             Rectangle {
@@ -203,9 +254,7 @@ Item {
                         readonly property bool isPortrait: (root.monitorTransform === 1 || root.monitorTransform === 3)
                         readonly property bool isSelected: root.selectedMonitor === "eDP-1"
                         
-                        // Strictly sized to stay cleanly bounded inside card:
-                        // Landscape: 188 x 104 (fits easily)
-                        // Portrait:  104 x 164 (comfortably leaves ~19px padding top and bottom)
+                        // Original shape and aspect ratio
                         width: isPortrait ? 104 : 188
                         height: isPortrait ? 164 : 104
 
@@ -224,6 +273,7 @@ Item {
                         Rectangle {
                             anchors.fill: parent
                             radius: 12
+                            clip: true
                             color: Qt.rgba(0.06, 0.06, 0.08, 0.85)
                             border.width: edp1Container.isSelected ? 1.5 : 1
                             border.color: edp1Container.isSelected ? Theme.primary : (edp1Mouse.containsMouse ? Qt.rgba(1, 1, 1, 0.30) : Qt.rgba(1, 1, 1, 0.12))
@@ -268,7 +318,7 @@ Item {
                                 Text {
                                     text: Math.round(root.monitorRate) + "Hz  •  " + (edp1Container.isPortrait ? "Portrait" : "Landscape")
                                     font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontPx(9)
+                                    font.pixelSize: edp1Container.isPortrait ? Theme.fontPx(7.5) : Theme.fontPx(9)
                                     color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
                                     Layout.alignment: Qt.AlignHCenter
                                 }
@@ -311,6 +361,7 @@ Item {
                         readonly property bool isPortrait: (root.dp1Transform === 1 || root.dp1Transform === 3)
                         readonly property bool isSelected: root.selectedMonitor === "DP-1"
                         
+                        // Original shape and aspect ratio
                         width: isPortrait ? 104 : 188
                         height: isPortrait ? 164 : 104
 
@@ -329,6 +380,7 @@ Item {
                         Rectangle {
                             anchors.fill: parent
                             radius: 12
+                            clip: true
                             color: Qt.rgba(0.06, 0.06, 0.08, 0.85)
                             border.width: dp1Container.isSelected ? 1.5 : 1
                             border.color: dp1Container.isSelected ? Theme.primary : (dp1Mouse.containsMouse ? Qt.rgba(1, 1, 1, 0.30) : Qt.rgba(1, 1, 1, 0.12))
@@ -361,7 +413,7 @@ Item {
                                 Text {
                                     text: Math.round(root.dp1Rate) + "Hz  •  " + (dp1Container.isPortrait ? "Portrait" : "Landscape")
                                     font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontPx(9)
+                                    font.pixelSize: dp1Container.isPortrait ? Theme.fontPx(7.5) : Theme.fontPx(9)
                                     color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
                                     Layout.alignment: Qt.AlignHCenter
                                 }
@@ -771,9 +823,7 @@ Item {
                             decimals: 2
                             unit: "x"
                             value: root.globalShellScale
-                            onMoved: (val) => {
-                                root.globalShellScale = val
-                            }
+                            onMoved: (val) => root.queueShellScale(val)
                         }
 
                         // Night-Owl Optics (Temperature) with ice-white to warm-amber gradient track

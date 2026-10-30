@@ -457,6 +457,43 @@ async fn set_temperature(temp: i64) {
     }
 }
 
+async fn set_shell_scale(scale: f64) -> Result<(), String> {
+    let cfg = config_dir();
+    let bar_pos_file = cfg.join("carbon-bar-position.json");
+    let hypr_bar_pos_file = home_dir().join(".config/hypr/carbon-bar-position.json");
+    
+    let mut data: Value = if bar_pos_file.exists() {
+        let content = fs::read_to_string(&bar_pos_file).unwrap_or_default();
+        serde_json::from_str(&content).unwrap_or_else(|_| json!({}))
+    } else {
+        json!({})
+    };
+    
+    if let Some(obj) = data.as_object_mut() {
+        obj.insert("scale".to_string(), json!(scale));
+    }
+    
+    let formatted = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+    let _ = fs::write(&bar_pos_file, &formatted);
+    let _ = fs::write(&hypr_bar_pos_file, &formatted);
+    Ok(())
+}
+
+async fn get_shell_scale() -> f64 {
+    let cfg = config_dir();
+    let bar_pos_file = cfg.join("carbon-bar-position.json");
+    if bar_pos_file.exists() {
+        if let Ok(content) = fs::read_to_string(&bar_pos_file) {
+            if let Ok(data) = serde_json::from_str::<Value>(&content) {
+                if let Some(s) = data.get("scale").and_then(|v| v.as_f64()) {
+                    return s;
+                }
+            }
+        }
+    }
+    1.0
+}
+
 // ---------------------------------------------------------------------------
 // MESSAGE ROUTER
 // ---------------------------------------------------------------------------
@@ -745,6 +782,35 @@ async fn handle_request(req: HubRequest) -> HubResponse {
                     error: Some(e),
                     elapsed_us: Some(t0.elapsed().as_micros()),
                 },
+            }
+        }
+        "set_shell_scale" => {
+            let scale = req.scale.or_else(|| req.value.and_then(|v| v.as_f64())).unwrap_or(1.0);
+            match set_shell_scale(scale).await {
+                Ok(_) => HubResponse {
+                    status: "ok".into(),
+                    action: Some(action),
+                    data: Some(json!({ "scale": scale })),
+                    error: None,
+                    elapsed_us: Some(t0.elapsed().as_micros()),
+                },
+                Err(e) => HubResponse {
+                    status: "error".into(),
+                    action: Some(action),
+                    data: None,
+                    error: Some(e),
+                    elapsed_us: Some(t0.elapsed().as_micros()),
+                },
+            }
+        }
+        "get_shell_scale" => {
+            let scale = get_shell_scale().await;
+            HubResponse {
+                status: "ok".into(),
+                action: Some(action),
+                data: Some(json!({ "scale": scale })),
+                error: None,
+                elapsed_us: Some(t0.elapsed().as_micros()),
             }
         }
         "set_vrr" => {

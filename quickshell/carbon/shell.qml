@@ -23,6 +23,7 @@ ShellRoot {
     property bool launcherOpen: false
     property bool wallpaperPickerOpen: false
     property bool settingsHubOpen: false
+    property real shellScale: (Theme && Theme.shellScale !== undefined) ? Theme.shellScale : 1.0
     property string wallpaperSource: "local"
     property var wallpaperModItem: null
     property var launcherItem: null
@@ -1011,11 +1012,20 @@ ShellRoot {
 
     property real shellOpacity: Theme.shellOpacity
     property bool shellBlur: true
-    property int pillHeight: 36
-    property int notchHeight: 34
-    property int appGap: 8
-    property int pillAppGap: 8
-    property int notchAppGap: 8
+    property int basePillHeight: 36
+    property int baseNotchHeight: 34
+    property int baseNotchEarRadius: 10
+    property int baseNotchBottomRadius: 14
+    property int baseAppGap: 8
+
+    property int pillHeight: Math.round(root.basePillHeight * root.shellScale)
+    property int notchHeight: Math.round(root.baseNotchHeight * root.shellScale)
+    property int notchEarRadius: Math.round(root.baseNotchEarRadius * root.shellScale)
+    property int notchBottomRadius: Math.round(root.baseNotchBottomRadius * root.shellScale)
+    property int sideNotchBottomRadius: Math.round(Math.min(8 * root.shellScale, root.notchBottomRadius))
+    property int appGap: Math.round(root.baseAppGap * root.shellScale)
+    property int pillAppGap: root.appGap
+    property int notchAppGap: root.appGap
     property real pillOpacity: root.shellOpacity
     property bool pillBlur: root.shellBlur
     property real notchOpacity: root.shellOpacity
@@ -1169,7 +1179,6 @@ ShellRoot {
                 window.showNotification(appName, summary, body);
         });
     }
-
     property int barHeight: root.barMode === "notch" ? root.notchHeight : root.pillHeight
     property string barEdge: "top"
     property string mainBarEdge: "top"
@@ -1189,10 +1198,6 @@ ShellRoot {
     readonly property string controlsCorner: {
         return (root.mainBarEdge === "bottom" || root.barEdge === "bottom") ? "bottom_right" : "top_right"
     }
-
-    property int notchEarRadius: 10
-    property int notchBottomRadius: 14
-    property int sideNotchBottomRadius: Math.min(8, root.notchBottomRadius)
 
     readonly property int popupTopMargin: {
         if (root.mainBarEdge === "bottom") return 0
@@ -1223,7 +1228,10 @@ ShellRoot {
         blockLoading: true
         printErrors: false
         onLoaded: root.applyBarPos(barPosFile.text())
-        onFileChanged: root.applyBarPos(barPosFile.text())
+        onFileChanged: {
+            reload()
+            root.applyBarPos(barPosFile.text())
+        }
     }
 
     function applyBarPos(txt) {
@@ -1246,15 +1254,24 @@ ShellRoot {
             if (d.centerAlign) root.centerAlign = d.centerAlign
             if (d.rightAlign) root.rightAlign = d.rightAlign
 
-            if (d.pillHeight !== undefined) root.pillHeight = parseInt(d.pillHeight) || 36
-            if (d.notchHeight !== undefined) root.notchHeight = parseInt(d.notchHeight) || 34
-            if (d.notchEarRadius !== undefined) root.notchEarRadius = parseInt(d.notchEarRadius) || 10
-            if (d.notchBottomRadius !== undefined) root.notchBottomRadius = parseInt(d.notchBottomRadius) || 14
-            if (d.appGap !== undefined) root.appGap = (!isNaN(parseInt(d.appGap))) ? parseInt(d.appGap) : 8
-            if (d.pillAppGap !== undefined) root.pillAppGap = (!isNaN(parseInt(d.pillAppGap))) ? parseInt(d.pillAppGap) : root.appGap
+            if (d.pillHeight !== undefined) root.basePillHeight = parseInt(d.pillHeight) || 36
+            if (d.notchHeight !== undefined) root.baseNotchHeight = parseInt(d.notchHeight) || 34
+            if (d.notchEarRadius !== undefined) root.baseNotchEarRadius = parseInt(d.notchEarRadius) || 10
+            if (d.notchBottomRadius !== undefined) root.baseNotchBottomRadius = parseInt(d.notchBottomRadius) || 14
+            if (d.appGap !== undefined) root.baseAppGap = (!isNaN(parseInt(d.appGap))) ? parseInt(d.appGap) : 8
+            if (d.pillAppGap !== undefined) root.pillAppGap = (!isNaN(parseInt(d.pillAppGap))) ? Math.round(parseInt(d.pillAppGap) * root.shellScale) : root.appGap
             else root.pillAppGap = root.appGap
-            if (d.notchAppGap !== undefined) root.notchAppGap = (!isNaN(parseInt(d.notchAppGap))) ? parseInt(d.notchAppGap) : root.appGap
+            if (d.notchAppGap !== undefined) root.notchAppGap = (!isNaN(parseInt(d.notchAppGap))) ? Math.round(parseInt(d.notchAppGap) * root.shellScale) : root.appGap
             else root.notchAppGap = root.appGap
+
+            if (d.scale !== undefined) {
+                var s = Math.max(0.75, Math.min(1.5, parseFloat(d.scale) || 1.0))
+                root.shellScale = s
+                if (Theme) {
+                    Theme.shellScale = s
+                    Theme.fontScale = s
+                }
+            }
 
             if (d.shellOpacity !== undefined) {
                 root.shellOpacity = Math.max(0.10, Math.min(1.0, parseFloat(d.shellOpacity) || 0.85))

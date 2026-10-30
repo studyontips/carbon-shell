@@ -18,12 +18,12 @@ NotchContainer {
 
     property bool isExpanded: false
     clip: true
-    bottomRadius: isExpanded ? 20 : 14
-    implicitHeight: isExpanded ? 270 : 34
-    implicitWidth: isExpanded ? 820 : (contentImplicitWidth + (leftFillet ? filletRadius : 0) + (rightFillet ? filletRadius : 0) + (horizontalPadding * 2))
+    bottomRadius: isExpanded ? Theme.px(20) : Theme.px(14)
+    implicitHeight: isExpanded ? Theme.px(270) : Theme.px(34)
+    implicitWidth: isExpanded ? Theme.px(820) : (contentImplicitWidth + (leftFillet ? filletRadius : 0) + (rightFillet ? filletRadius : 0) + (horizontalPadding * 2))
 
-    earWidth: 20
-    contentSpacing: 8
+    earWidth: Theme.px(20)
+    contentSpacing: Theme.px(8)
 
     signal openMusicHover()
     signal closeMusicHover()
@@ -136,7 +136,7 @@ NotchContainer {
         Item {
             id: notchContentContainer
             anchors.verticalCenter: parent.verticalCenter
-            implicitHeight: 26
+            implicitHeight: Theme.px(26)
             implicitWidth: root.hudActive ? dynamicPill.implicitWidth : normalNotchRow.implicitWidth
             opacity: root.isExpanded ? 0.0 : 1.0
             visible: opacity > 0.01
@@ -165,7 +165,7 @@ NotchContainer {
             Row {
                 id: normalNotchRow
                 anchors.centerIn: parent
-                spacing: 8
+                spacing: Theme.px(8)
                 opacity: root.hudActive ? 0.0 : 1.0
                 visible: opacity > 0.01
 
@@ -196,8 +196,8 @@ NotchContainer {
 
         /* 2. Vertical Divider */
         Rectangle {
-            width: 1.5
-            height: 16
+            width: Math.max(1, Theme.px(1.5))
+            height: Theme.px(16)
             color: Qt.alpha(Theme.fg, 0.40)
             anchors.verticalCenter: parent.verticalCenter
             visible: root.barContent === "both"
@@ -206,21 +206,21 @@ NotchContainer {
         /* 3. Music Section (Disc + Track Info) */
         Item {
             anchors.verticalCenter: parent.verticalCenter
-            implicitHeight: 26
+            implicitHeight: Theme.px(26)
             implicitWidth: musicRow.implicitWidth
             visible: root.barContent !== "clock"
 
             Row {
                 id: musicRow
-                spacing: 8
+                spacing: Theme.px(8)
                 anchors.verticalCenter: parent.verticalCenter
 
                 /* Spinning Vinyl Disc / Album art */
                 Rectangle {
                     id: discContainer
-                    width: 22
-                    height: 22
-                    radius: 11
+                    width: Theme.px(22)
+                    height: Theme.px(22)
+                    radius: Theme.px(11)
                     color: Theme.bgAlt
                     border.color: Theme.accent
                     border.width: 1.5
@@ -239,7 +239,7 @@ NotchContainer {
                         id: albumArtImg
                         anchors.fill: parent
                         source: root.artUrl
-                        sourceSize: Qt.size(44, 44)
+                        sourceSize: Qt.size(Theme.px(44), Theme.px(44))
                         visible: root.hasTrack && root.artUrl.length > 0
                         fillMode: Image.PreserveAspectCrop
                     }
@@ -253,7 +253,7 @@ NotchContainer {
                             anchors.centerIn: parent
                             text: "music_note"
                             font.family: Theme.fontIcon
-                            font.pixelSize: 14
+                            font.pixelSize: Theme.fontPx(14)
                             color: Theme.accent
                         }
                     }
@@ -262,16 +262,16 @@ NotchContainer {
                 /* Dynamic Island 4-Bar Equalizer Waveform */
                 Row {
                     id: eqWaveform
-                    spacing: 2
+                    spacing: Math.max(1, Theme.px(2))
                     anchors.verticalCenter: parent.verticalCenter
                     visible: root.showEqualizer && root.hasTrack
 
                     Repeater {
                         model: [
-                            { minH: 3, maxH: 13, dur: 380 },
-                            { minH: 4, maxH: 15, dur: 520 },
-                            { minH: 3, maxH: 11, dur: 440 },
-                            { minH: 4, maxH: 14, dur: 610 }
+                            { minH: Theme.px(3), maxH: Theme.px(13), dur: 380 },
+                            { minH: Theme.px(4), maxH: Theme.px(15), dur: 520 },
+                            { minH: Theme.px(3), maxH: Theme.px(11), dur: 440 },
+                            { minH: Theme.px(4), maxH: Theme.px(14), dur: 610 }
                         ]
 
                         delegate: Rectangle {
@@ -279,12 +279,12 @@ NotchContainer {
                             required property var modelData
                             required property int index
 
-                            width: 2.5
-                            radius: 1.25
+                            width: Math.max(1, Theme.px(2.5))
+                            radius: Math.max(1, Theme.px(1.25))
                             color: Theme.accent
                             anchors.verticalCenter: parent.verticalCenter
 
-                            height: root.isPlaying ? modelData.minH : 2.5
+                            height: root.isPlaying ? modelData.minH : Math.max(1, Theme.px(2.5))
 
                             SequentialAnimation on height {
                                 running: root.isPlaying && root.visible
@@ -313,7 +313,7 @@ NotchContainer {
                         font.weight: Font.Bold
                         color: root.hasTrack ? Theme.fg : Theme.fgDim
                         elide: Text.ElideRight
-                        width: Math.min(implicitWidth, 150)
+                        width: Math.min(implicitWidth, Theme.px(150))
                     }
 
                     Text {
@@ -323,7 +323,7 @@ NotchContainer {
                         font.weight: Font.Medium
                         color: Theme.fgDim
                         elide: Text.ElideRight
-                        width: Math.min(implicitWidth, 150)
+                        width: Math.min(implicitWidth, Theme.px(150))
                         visible: text.length > 0
                     }
                 }

@@ -9,6 +9,17 @@ Item {
     property real from: 0
     property real to: 100
     property real value: 0
+    property real internalValue: (value !== 0 ? value : from)
+    onValueChanged: {
+        if (!mouseArea.pressed) {
+            internalValue = value
+        }
+    }
+    Component.onCompleted: {
+        if (root.value !== undefined && !isNaN(root.value)) {
+            root.internalValue = root.value
+        }
+    }
     property real stepSize: 1
     property string unit: ""
     property int decimals: 0
@@ -19,7 +30,7 @@ Item {
     signal moved(real val)
 
     implicitWidth: 300
-    implicitHeight: 48
+    implicitHeight: Math.max(48, Math.round(48 * (Theme && Theme.fontScale !== undefined ? Theme.fontScale : 1.0)))
 
     ColumnLayout {
         anchors.fill: parent
@@ -40,7 +51,7 @@ Item {
             Item { Layout.fillWidth: true }
 
             Text {
-                text: root.value.toFixed(root.decimals) + (root.unit.length > 0 ? (" " + root.unit) : "")
+                text: root.internalValue.toFixed(root.decimals) + (root.unit.length > 0 ? (" " + root.unit) : "")
                 font.family: Theme.fontMono
                 font.pixelSize: Theme.fontPx(11)
                 font.weight: Font.DemiBold
@@ -55,7 +66,7 @@ Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 18
 
-            readonly property real normVal: Math.max(0.0, Math.min(1.0, (root.value - root.from) / (root.to - root.from || 1)))
+            readonly property real normVal: Math.max(0.0, Math.min(1.0, (root.internalValue - root.from) / (root.to - root.from || 1)))
             readonly property real handleX: normVal * (trackContainer.width - 12)
 
             // Inactive track (1px solid hairline or linear gradient)
@@ -124,7 +135,10 @@ Item {
                         raw = Math.round(raw / root.stepSize) * root.stepSize
                     }
                     var clamped = Math.max(root.from, Math.min(root.to, raw))
-                    root.value = clamped
+                    if (root.decimals >= 0) {
+                        clamped = parseFloat(clamped.toFixed(root.decimals))
+                    }
+                    root.internalValue = clamped
                     root.moved(clamped)
                 }
 

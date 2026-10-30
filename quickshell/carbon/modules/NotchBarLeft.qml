@@ -105,14 +105,14 @@ NotchContainer {
         /* 1. App Launcher / Brand Button */
         Item {
             id: launcherBtn
-            width: 26
-            height: 26
+            width: Theme.px(26)
+            height: Theme.px(26)
             anchors.verticalCenter: parent.verticalCenter
             readonly property bool isHovered: launcherMouse.containsMouse
 
             Rectangle {
                 anchors.fill: parent
-                radius: 6
+                radius: Theme.px(6)
                 color: launcherBtn.isHovered ? Qt.alpha(Theme.accent, 0.15) : "transparent"
                 border.color: launcherBtn.isHovered ? Theme.accent : "transparent"
                 border.width: 1
@@ -124,7 +124,7 @@ NotchContainer {
                 anchors.centerIn: parent
                 text: (typeof Theme !== "undefined" && Theme.distroIcon) ? Theme.distroIcon : "󰣇"
                 font.family: "JetBrainsMono Nerd Font"
-                font.pixelSize: 16
+                font.pixelSize: Theme.fontPx(16)
                 color: launcherBtn.isHovered ? Theme.accent : Theme.fg
                 Behavior on color { ColorAnimation { duration: 120 } }
             }
@@ -141,7 +141,7 @@ NotchContainer {
         /* Subtle Vertical Divider */
         Rectangle {
             width: 1
-            height: 14
+            height: Theme.px(14)
             anchors.verticalCenter: parent.verticalCenter
             color: Qt.alpha(Theme.fg, 0.15)
         },
@@ -150,12 +150,12 @@ NotchContainer {
         Item {
             id: wsContainer
             implicitWidth: wsRow.implicitWidth
-            implicitHeight: 24
+            implicitHeight: Theme.px(24)
             anchors.verticalCenter: parent.verticalCenter
 
             Row {
                 id: wsRow
-                spacing: 8
+                spacing: Theme.px(8)
                 anchors.verticalCenter: parent.verticalCenter
 
                 Repeater {
@@ -169,15 +169,15 @@ NotchContainer {
                         readonly property bool isOccupied: (root.activeWorkspaces.indexOf(wsId) !== -1)
                         readonly property bool isHovered: wsMouse.containsMouse
 
-                        width: 22
-                        height: 22
+                        width: Theme.px(22)
+                        height: Theme.px(22)
                         anchors.verticalCenter: parent.verticalCenter
 
                         Text {
                             anchors.centerIn: parent
                             text: wsItem.isActive ? root.activeWsGlyph : root.inactiveWsGlyph
                             font.family: "JetBrainsMono Nerd Font"
-                            font.pixelSize: wsItem.isActive ? 16 : 14
+                            font.pixelSize: Theme.fontPx(wsItem.isActive ? 16 : 14)
                             scale: wsItem.isActive ? 1.25 : (wsItem.isHovered ? 1.15 : (wsItem.isOccupied ? 1.0 : 0.85))
                             color: {
                                 if (wsItem.isActive) return Theme.accent
