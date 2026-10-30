@@ -295,6 +295,26 @@ mkdir -p "$BIN_DIR"
 [[ -f "$REPO_DIR/update.sh" ]] && cp -f "$REPO_DIR/update.sh" "$BIN_DIR/carbon-update"
 [[ -f "$CONFIG_DIR/scripts/carbon-config-editor" ]] && cp -f "$CONFIG_DIR/scripts/carbon-config-editor" "$BIN_DIR/carbon-config-editor"
 [[ -f "$CONFIG_DIR/scripts/carbon-pomodoro" ]] && cp -f "$CONFIG_DIR/scripts/carbon-pomodoro" "$BIN_DIR/carbon-pomodoro"
+[[ -f "$CONFIG_DIR/scripts/carbon-settings-hub" ]] && cp -f "$CONFIG_DIR/scripts/carbon-settings-hub" "$BIN_DIR/carbon-settings-hub"
+
+# Carbon Settings Hub daemon (Rust)
+if [[ -d "$REPO_DIR/backend/carbon-hub-daemon" ]]; then
+    if [[ ! -f "$REPO_DIR/backend/carbon-hub-daemon/target/release/carbon-hub-daemon" ]] && command -v cargo >/dev/null 2>&1; then
+        (cd "$REPO_DIR/backend/carbon-hub-daemon" && cargo build --release --quiet) || true
+    fi
+    if [[ -f "$REPO_DIR/backend/carbon-hub-daemon/target/release/carbon-hub-daemon" ]]; then
+        cp -f "$REPO_DIR/backend/carbon-hub-daemon/target/release/carbon-hub-daemon" "$BIN_DIR/carbon-hub-daemon"
+        chmod +x "$BIN_DIR/carbon-hub-daemon"
+    fi
+    if [[ -f "$REPO_DIR/systemd/carbon-hub.service" ]]; then
+        mkdir -p "$SYSTEMD_USER_DIR"
+        cp -f "$REPO_DIR/systemd/carbon-hub.service" "$SYSTEMD_USER_DIR/"
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl --user daemon-reload >/dev/null 2>&1 || true
+            systemctl --user enable carbon-hub.service >/dev/null 2>&1 || true
+        fi
+    fi
+fi
 
 for s in "$CONFIG_DIR/scripts/carbon-screenshot-"*.sh; do
     if [[ -f "$s" ]]; then

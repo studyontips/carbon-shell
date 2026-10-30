@@ -91,7 +91,7 @@ create_safety_backup() {
     local bdir="$CONFIG_DIR/backups"
     local bfile="$bdir/carbon-backup-$(date +'%Y%m%d_%H%M%S').tar.gz"
     mkdir -p "$bdir"
-    tar -czf "$bfile" -C "$HOME" ".local/share/quickshell/carbon" ".config/carbon" 2>/dev/null || true
+    tar --exclude=".config/carbon/backups" -czf "$bfile" -C "$HOME" ".local/share/quickshell/carbon" ".config/carbon" 2>/dev/null || true
     if [[ -f "$bfile" ]]; then
         ok "Safety backup created: $(basename "$bfile")"
         ls -1t "$bdir"/carbon-backup-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
@@ -249,6 +249,17 @@ mkdir -p "$BIN_DIR"
 [[ -f "$REPO_DIR/update.sh" ]] && cp -f "$REPO_DIR/update.sh" "$BIN_DIR/carbon-update"
 [[ -f "$CONFIG_DIR/scripts/carbon-config-editor" ]] && cp -f "$CONFIG_DIR/scripts/carbon-config-editor" "$BIN_DIR/carbon-config-editor"
 [[ -f "$CONFIG_DIR/scripts/carbon-pomodoro" ]] && cp -f "$CONFIG_DIR/scripts/carbon-pomodoro" "$BIN_DIR/carbon-pomodoro"
+[[ -f "$CONFIG_DIR/scripts/carbon-settings-hub" ]] && cp -f "$CONFIG_DIR/scripts/carbon-settings-hub" "$BIN_DIR/carbon-settings-hub"
+
+if [[ -f "$REPO_DIR/backend/carbon-hub-daemon/target/release/carbon-hub-daemon" ]]; then
+    cp -f "$REPO_DIR/backend/carbon-hub-daemon/target/release/carbon-hub-daemon" "$BIN_DIR/carbon-hub-daemon"
+fi
+if [[ -f "$REPO_DIR/systemd/carbon-hub.service" ]]; then
+    mkdir -p "$SYSTEMD_USER_DIR"
+    cp -f "$REPO_DIR/systemd/carbon-hub.service" "$SYSTEMD_USER_DIR/"
+    systemctl --user daemon-reload >/dev/null 2>&1 || true
+    systemctl --user enable --now carbon-hub.service >/dev/null 2>&1 || true
+fi
 
 for s in "$CONFIG_DIR/scripts/carbon-screenshot-"*.sh; do
     if [[ -f "$s" ]]; then
