@@ -15,16 +15,14 @@ Item {
     readonly property string wallpaperDir: (Quickshell.env("HOME") || "") + "/Pictures/Wallpapers"
     readonly property string stateFile: (Quickshell.env("CARBON_CONFIG_DIR") || ((Quickshell.env("HOME") || "") + "/.config/carbon")) + "/current_wallpaper_path"
     readonly property string hyprStateFile: (Quickshell.env("HOME") || "") + "/.config/hypr/current_wallpaper_path"
-    readonly property string wallhavenScript: (Quickshell.env("CARBON_CONFIG_DIR") || ((Quickshell.env("HOME") || "") + "/.config/carbon")) + "/scripts/wallhaven.py"
-    readonly property string matugenScript: (Quickshell.env("CARBON_CONFIG_DIR") || ((Quickshell.env("HOME") || "") + "/.config/carbon")) + "/scripts/matugen-scheme.sh"
-    readonly property string hyprControlScript: (Quickshell.env("CARBON_CONFIG_DIR") || ((Quickshell.env("HOME") || "") + "/.config/carbon")) + "/scripts/hypr-control.sh"
+    readonly property string ambientGlowFile: (Quickshell.env("CARBON_CONFIG_DIR") || ((Quickshell.env("HOME") || "") + "/.config/carbon")) + "/ambient_glow_state"
 
     property string currentWallpaperPath: ""
     property var localWallpapers: []
     property string activeScheme: "Tonal Spot"
     property bool liveBgPaused: false
 
-    // Hyprland options
+    // Hyprland compositor options
     property real blurRadius: 5
     property real gapsOut: 6
     property real activeOpacity: 1.0
@@ -34,7 +32,135 @@ Item {
     property bool ambientGlow: false
     property bool m3Transitions: false
 
-    // FileView for current wallpaper tracking
+    // -----------------------------------------------------------------------
+    // RUST BACKEND IPC SOCKET CLIENT (/tmp/carbon-hub.sock)
+    // -----------------------------------------------------------------------
+    Socket {
+        id: hubSocket
+        path: "/tmp/carbon-hub.sock"
+        connected: true
+
+        onConnectedChanged: {
+            if (connected) {
+                root.sendHub({ "module": "appearance", "action": "get_state" })
+            }
+        }
+
+        parser: SplitParser {
+            splitMarker: "\n"
+            onRead: function(chunk) {
+                var raw = chunk.trim()
+                if (!raw) return
+                try {
+                    var resp = JSON.parse(raw)
+                    if (resp && resp.status === "ok" && resp.data) {
+                        if (resp.action === "get_state") {
+                            var d = resp.data
+                            if (d.hypr) {
+                                if (d.hypr.blur !== undefined) root.blurRadius = d.hypr.blur
+                                if (d.hypr.gaps !== undefined) root.gapsOut = d.hypr.gaps
+                                if (d.hypr.active_opacity !== undefined) root.activeOpacity = d.hypr.active_opacity
+                                if (d.hypr.inactive_opacity !== undefined) root.inactiveOpacity = d.hypr.inactive_opacity
+                                if (d.hypr.border !== undefined) root.borderWidth = d.hypr.border
+                                if (d.hypr.shadow !== undefined) root.windowShadows = d.hypr.shadow
+                            }
+                            if (d.current_wallpaper) {
+                                root.currentWallpaperPath = d.current_wallpaper
+                            }
+                            if (d.wallpapers && Array.isArray(d.wallpapers) && d.wallpapers.length > 0) {
+                                root.localWallpapers = d.wallpapers
+                            }
+                        } else if (resp.action === "set_wallpaper" || resp.action === "shuffle_wallpaper") {
+                            if (resp.data && resp.data.path) {
+                                root.currentWallpaperPath = resp.data.path
+                            }
+                        } else if (resp.action === "list_wallpapers") {
+                            if (Array.isArray(resp.data)) {
+                                root.localWallpapers = resp.data
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.log("[AppearanceTab] Socket parse error:", e)
+                }
+            }
+        }
+    }
+
+    Timer {
+        id: reconnectTimer
+        interval: 1500
+        repeat: true
+        running: !hubSocket.connected
+        onTriggered: {
+            hubSocket.connected = true
+        }
+    }
+
+    function sendHub(obj) {
+        if (hubSocket.connected) {
+            hubSocket.write(JSON.stringify(obj) + "\n")
+            hubSocket.flush()
+        }
+    }
+
+    // Debounce timers for 60fps real-time compositor sliders
+    Timer {
+        id: blurDebounce
+        interval: 16
+        repeat: false
+        onTriggered: root.sendHub({ "module": "appearance", "action": "set_blur", "value": root.blurRadius })
+    }
+    function queueBlur(val) {
+        root.blurRadius = val
+        blurDebounce.restart()
+    }
+
+    Timer {
+        id: gapsDebounce
+        interval: 16
+        repeat: false
+        onTriggered: root.sendHub({ "module": "appearance", "action": "set_gaps", "value": root.gapsOut })
+    }
+    function queueGaps(val) {
+        root.gapsOut = val
+        gapsDebounce.restart()
+    }
+
+    Timer {
+        id: activeOpacityDebounce
+        interval: 16
+        repeat: false
+        onTriggered: root.sendHub({ "module": "appearance", "action": "set_active_opacity", "value": root.activeOpacity })
+    }
+    function queueActiveOpacity(val) {
+        root.activeOpacity = val
+        activeOpacityDebounce.restart()
+    }
+
+    Timer {
+        id: inactiveOpacityDebounce
+        interval: 16
+        repeat: false
+        onTriggered: root.sendHub({ "module": "appearance", "action": "set_inactive_opacity", "value": root.inactiveOpacity })
+    }
+    function queueInactiveOpacity(val) {
+        root.inactiveOpacity = val
+        inactiveOpacityDebounce.restart()
+    }
+
+    Timer {
+        id: borderDebounce
+        interval: 16
+        repeat: false
+        onTriggered: root.sendHub({ "module": "appearance", "action": "set_border", "value": root.borderWidth })
+    }
+    function queueBorder(val) {
+        root.borderWidth = val
+        borderDebounce.restart()
+    }
+
+    // FileView for live wallpaper state tracking (fallback/live sync across shell)
     FileView {
         id: wpLinkFile
         path: root.stateFile
@@ -69,106 +195,37 @@ Item {
         }
     }
 
+    FileView {
+        id: glowFile
+        path: root.ambientGlowFile
+        blockLoading: true
+        watchChanges: true
+        printErrors: false
+        onLoaded: {
+            var t = glowFile.text().trim()
+            root.ambientGlow = (t === "1")
+        }
+        onFileChanged: {
+            reload()
+            var t = glowFile.text().trim()
+            root.ambientGlow = (t === "1")
+        }
+    }
+
     Component.onCompleted: {
-        loadLocalWallpapers()
-        loadHyprlandOptions()
+        root.sendHub({ "module": "appearance", "action": "get_state" })
     }
 
-    function loadLocalWallpapers() {
-        if (!listProc.running) {
-            listProc.command = ["python3", root.wallhavenScript, "list-local"]
-            listProc.running = true
-        }
-    }
-
-    function loadHyprlandOptions() {
-        if (!hyprQueryProc.running) {
-            hyprQueryProc.command = [root.hyprControlScript, "get", "all"]
-            hyprQueryProc.running = true
-        }
-    }
-
-    function applyWallpaper(path) {
-        if (!path) return
-        root.currentWallpaperPath = path
-        Quickshell.execDetached(["python3", root.wallhavenScript, "apply", path])
-    }
-
-    function shuffleRandomWallpaper() {
-        if (root.localWallpapers.length === 0) return
-        var idx = Math.floor(Math.random() * root.localWallpapers.length)
-        var item = root.localWallpapers[idx]
-        if (item && item.path) {
-            applyWallpaper(item.path)
-        }
-    }
-
-    function setScheme(schemeName) {
-        root.activeScheme = schemeName
-        Quickshell.execDetached([root.matugenScript, schemeName])
-    }
-
-    function updateHypr(key, val) {
-        Quickshell.execDetached([root.hyprControlScript, "set", key, String(val)])
-    }
-
-    Process {
-        id: listProc
-        property string buffer: ""
-        onRunningChanged: {
-            if (running) {
-                buffer = ""
-            } else if (buffer.trim().length > 0) {
-                try {
-                    var res = JSON.parse(buffer)
-                    if (res && res.success && Array.isArray(res.data)) {
-                        root.localWallpapers = res.data
-                    }
-                } catch (e) {
-                    console.log("[AppearanceTab] Failed to parse wallpapers:", e)
-                }
-            }
-        }
-        stdout: SplitParser {
-            onRead: (chunk) => { listProc.buffer += chunk + "\n" }
-        }
-    }
-
-    Process {
-        id: hyprQueryProc
-        property string buffer: ""
-        onRunningChanged: {
-            if (running) {
-                buffer = ""
-            } else if (buffer.trim().length > 0) {
-                try {
-                    var res = JSON.parse(buffer)
-                    if (res) {
-                        if (res.blur !== undefined) root.blurRadius = res.blur
-                        if (res.gaps !== undefined) root.gapsOut = res.gaps
-                        if (res.active_opacity !== undefined) root.activeOpacity = res.active_opacity
-                        if (res.inactive_opacity !== undefined) root.inactiveOpacity = res.inactive_opacity
-                        if (res.border !== undefined) root.borderWidth = res.border
-                        if (res.shadow !== undefined) root.windowShadows = (res.shadow === true || res.shadow === "true")
-                    }
-                } catch (e) {
-                    console.log("[AppearanceTab] Failed to parse hypr options:", e)
-                }
-            }
-        }
-        stdout: SplitParser {
-            onRead: (chunk) => { hyprQueryProc.buffer += chunk + "\n" }
-        }
-    }
-
-    // 2-Column Asymmetric Layout
+    // -----------------------------------------------------------------------
+    // 2-COLUMN ASYMMETRIC SPLIT LAYOUT (Left: Gallery & Colors, Right: Compositor)
+    // -----------------------------------------------------------------------
     RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        // ==========================================
-        // LEFT COLUMN: Gallery & Colors (approx 58%)
-        // ==========================================
+        // ===================================================================
+        // LEFT COLUMN: Wallpapers & Matugen Engine (58%)
+        // ===================================================================
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -223,7 +280,7 @@ Item {
                         Layout.fillWidth: true
                         spacing: 12
 
-                        // Shuffle Random Button
+                        // Flush Shuffle Random Button
                         Rectangle {
                             Layout.preferredWidth: shuffleText.implicitWidth + 24
                             Layout.preferredHeight: 32
@@ -247,7 +304,7 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.shuffleRandomWallpaper()
+                                onClicked: root.sendHub({ "module": "appearance", "action": "shuffle_wallpaper" })
                             }
                         }
 
@@ -267,17 +324,13 @@ Item {
                                 checked: root.liveBgPaused
                                 onClicked: {
                                     root.liveBgPaused = !root.liveBgPaused
-                                    if (root.liveBgPaused) {
-                                        Quickshell.execDetached(["pkill", "-STOP", "-f", "mpvpaper|swww"])
-                                    } else {
-                                        Quickshell.execDetached(["pkill", "-CONT", "-f", "mpvpaper|swww"])
-                                    }
+                                    root.sendHub({ "module": "appearance", "action": "pause_live_bg", "value": root.liveBgPaused })
                                 }
                             }
                         }
                     }
 
-                    // Horizontal Thumbnails Carousel (140x80, radius 8, NO text overlays)
+                    // Horizontal Scrolling Thumbnails Carousel (140x80, radius 8, NO text overlays)
                     Item {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 88
@@ -313,7 +366,10 @@ Item {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.applyWallpaper(modelData.path)
+                                    onClicked: {
+                                        root.currentWallpaperPath = modelData.path
+                                        root.sendHub({ "module": "appearance", "action": "set_wallpaper", "path": modelData.path })
+                                    }
                                 }
                             }
                         }
@@ -326,9 +382,9 @@ Item {
                         color: Qt.rgba(1, 1, 1, 0.08)
                     }
 
-                    // ==========================================
+                    // =======================================================
                     // MATUGEN COLOR ENGINE
-                    // ==========================================
+                    // =======================================================
                     Text {
                         text: "Matugen Color Scheme"
                         font.family: Theme.font
@@ -337,7 +393,7 @@ Item {
                         color: Qt.rgba(1, 1, 1, 0.85)
                     }
 
-                    // Inline Row of 5 Live Circular Color Chips (radius: 12, 24px)
+                    // 5 Live Circular Color Chips (radius: 12, 24px)
                     RowLayout {
                         spacing: 14
 
@@ -376,7 +432,7 @@ Item {
                         }
                     }
 
-                    // Clickable Segmented Scheme Buttons: Tonal Spot | Expressive | Fidelity | Monochrome
+                    // Segmented Scheme Selector: Tonal Spot | Expressive | Fidelity | Monochrome
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 0
@@ -405,7 +461,10 @@ Item {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.setScheme(modelData)
+                                    onClicked: {
+                                        root.activeScheme = modelData
+                                        root.sendHub({ "module": "appearance", "action": "set_scheme", "scheme": modelData })
+                                    }
                                 }
                             }
                         }
@@ -414,18 +473,18 @@ Item {
             }
         }
 
-        // ==========================================
+        // ===================================================================
         // 1PX VERTICAL HAIRLINE SEPARATOR
-        // ==========================================
+        // ===================================================================
         Rectangle {
             Layout.fillHeight: true
             Layout.preferredWidth: 1
             color: Qt.rgba(1, 1, 1, 0.08)
         }
 
-        // ==========================================
-        // RIGHT COLUMN: Compositor & Features (approx 42%)
-        // ==========================================
+        // ===================================================================
+        // RIGHT COLUMN: Compositor & Window Rules (42%)
+        // ===================================================================
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -455,7 +514,7 @@ Item {
                         color: Qt.rgba(1, 1, 1, 0.45)
                     }
 
-                    // 5 Razor Wire Sliders (NO Rounded Corners slider)
+                    // 5 Razor Wire & Diamond Sliders with Debounced Realtime Dispatch
                     RazorWireSlider {
                         Layout.fillWidth: true
                         label: "Blur Radius"
@@ -465,10 +524,7 @@ Item {
                         decimals: 0
                         unit: "px"
                         value: root.blurRadius
-                        onMoved: (val) => {
-                            root.blurRadius = val
-                            root.updateHypr("blur", val)
-                        }
+                        onMoved: (val) => root.queueBlur(val)
                     }
 
                     RazorWireSlider {
@@ -480,10 +536,7 @@ Item {
                         decimals: 0
                         unit: "px"
                         value: root.gapsOut
-                        onMoved: (val) => {
-                            root.gapsOut = val
-                            root.updateHypr("gaps", val)
-                        }
+                        onMoved: (val) => root.queueGaps(val)
                     }
 
                     RazorWireSlider {
@@ -494,10 +547,7 @@ Item {
                         stepSize: 0.05
                         decimals: 2
                         value: root.activeOpacity
-                        onMoved: (val) => {
-                            root.activeOpacity = val
-                            root.updateHypr("active_opacity", val)
-                        }
+                        onMoved: (val) => root.queueActiveOpacity(val)
                     }
 
                     RazorWireSlider {
@@ -508,10 +558,7 @@ Item {
                         stepSize: 0.05
                         decimals: 2
                         value: root.inactiveOpacity
-                        onMoved: (val) => {
-                            root.inactiveOpacity = val
-                            root.updateHypr("inactive_opacity", val)
-                        }
+                        onMoved: (val) => root.queueInactiveOpacity(val)
                     }
 
                     RazorWireSlider {
@@ -523,10 +570,7 @@ Item {
                         decimals: 0
                         unit: "px"
                         value: root.borderWidth
-                        onMoved: (val) => {
-                            root.borderWidth = val
-                            root.updateHypr("border", val)
-                        }
+                        onMoved: (val) => root.queueBorder(val)
                     }
 
                     // Structural Hairline
@@ -561,7 +605,7 @@ Item {
                             checked: root.windowShadows
                             onClicked: {
                                 root.windowShadows = !root.windowShadows
-                                root.updateHypr("shadow", root.windowShadows ? "true" : "false")
+                                root.sendHub({ "module": "appearance", "action": "set_shadow", "value": root.windowShadows })
                             }
                         }
                     }
@@ -582,7 +626,7 @@ Item {
                             checked: root.ambientGlow
                             onClicked: {
                                 root.ambientGlow = !root.ambientGlow
-                                Quickshell.execDetached(["sh", "-c", "echo " + (root.ambientGlow ? "1" : "0") + " > ~/.config/carbon/ambient_glow_state"])
+                                root.sendHub({ "module": "appearance", "action": "set_ambient_glow", "value": root.ambientGlow })
                             }
                         }
                     }
