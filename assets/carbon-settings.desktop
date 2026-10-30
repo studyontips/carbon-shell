@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Carbon Settings
+GenericName=Settings Hub
+Comment=Configure Carbon Shell, displays, appearance, audio, and network
+Exec=carbon-settings-hub
+Icon=preferences-system
+Terminal=false
+Type=Application
+Categories=Settings;DesktopSettings;
+StartupNotify=true
+StartupWMClass=carbon-settings-hub

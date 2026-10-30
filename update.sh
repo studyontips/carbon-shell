@@ -244,6 +244,14 @@ for j in "$REPO_DIR/hypr/"*.json; do
     [[ ! -f "$target" ]] && cp -f "$j" "$target"
 done
 
+# Deploy desktop entries
+mkdir -p "$HOME/.local/share/applications"
+if [[ -f "$REPO_DIR/assets/carbon-settings.desktop" ]]; then
+    cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-settings.desktop"
+    cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-settings-hub.desktop"
+    cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-config-editor.desktop"
+fi
+
 # Synchronize binaries
 mkdir -p "$BIN_DIR"
 [[ -f "$REPO_DIR/update.sh" ]] && cp -f "$REPO_DIR/update.sh" "$BIN_DIR/carbon-update"

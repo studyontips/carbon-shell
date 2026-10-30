@@ -1216,12 +1216,12 @@ Item {
         },
         {
             id: "config",
-            title: "Carbon Config & Theme Editor",
-            desc: "Configure shell layout, notch mode, and keybinds",
+            title: "Carbon Settings Hub",
+            desc: "Configure shell layout, displays, appearance, and audio",
             glyph: "settings",
             run: () => {
                 root.close()
-                Quickshell.execDetached(["python3", root.home + "/.config/hypr/scripts/carbon-config-editor.py"])
+                Quickshell.execDetached(["carbon-settings-hub"])
             }
         },
         {

@@ -38,8 +38,9 @@ hl.bind(mainMod .. " + " .. "SHIFT" .. " + Q", hl.dsp.exec_cmd("~/.config/hypr/s
 -- Mode-specific shell controls (SUPER+C, SUPER+R, SUPER+N, etc.) are loaded
 -- dynamically from ~/.config/hypr/current-mode-keybinds.lua
 -- ==============================================================================
--- Carbon Config Editor GUI (Settings)
-hl.bind(mainMod .. " + comma", hl.dsp.exec_cmd(homeDir .. "/.config/hypr/scripts/carbon-config-editor"))
+-- Carbon Settings GUI
+hl.bind(mainMod .. " + comma", hl.dsp.exec_cmd(homeDir .. "/.config/carbon/scripts/carbon-settings-hub"))
+hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd(homeDir .. "/.config/carbon/scripts/carbon-settings-hub"))
 
 -- Carbon Pomodoro Timer
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/carbon-pomodoro"))

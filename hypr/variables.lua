@@ -8,7 +8,7 @@ return {
     -- Apps
     terminal                   = "foot",
     browser                    = "firefox",
-    editor                     = (os.getenv("HOME") or "") .. "/.config/hypr/scripts/carbon-config-editor",
+    editor                     = (os.getenv("HOME") or "") .. "/.config/carbon/scripts/carbon-settings-hub",
     pomodoro                   = (os.getenv("HOME") or "") .. "/.config/hypr/scripts/carbon-pomodoro",
     fileExplorer               = "thunar",
     audioSettings              = "pavucontrol",

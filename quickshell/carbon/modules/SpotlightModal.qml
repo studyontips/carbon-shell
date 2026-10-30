@@ -260,14 +260,14 @@ Item {
         },
         {
             id: "config",
-            title: "Carbon Config & Theme Editor",
-            desc: "Configure shell layout, notch mode, and keybinds",
+            title: "Carbon Settings Hub",
+            desc: "Configure shell layout, displays, appearance, and audio",
             glyph: "settings",
             appIcon: "carbon-settings",
             category: "Preferences",
             run: () => {
                 root.closeRequested()
-                Quickshell.execDetached(["carbon-config-editor"])
+                Quickshell.execDetached(["carbon-settings-hub"])
             }
         },
         {

@@ -290,6 +290,14 @@ if [[ -d "$REPO_DIR/fonts" ]]; then
     command -v fc-cache >/dev/null 2>&1 && fc-cache -f >/dev/null 2>&1 || true
 fi
 
+# Deploy desktop entries
+mkdir -p "$HOME/.local/share/applications"
+if [[ -f "$REPO_DIR/assets/carbon-settings.desktop" ]]; then
+    cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-settings.desktop"
+    cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-settings-hub.desktop"
+    cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-config-editor.desktop"
+fi
+
 # Deploy user binaries
 mkdir -p "$BIN_DIR"
 [[ -f "$REPO_DIR/update.sh" ]] && cp -f "$REPO_DIR/update.sh" "$BIN_DIR/carbon-update"

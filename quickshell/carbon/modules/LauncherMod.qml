@@ -55,11 +55,11 @@ Item {
         {
             "id": "config",
             "name": "Carbon Settings",
-            "desc": "Open Carbon Config & Keybind Editor",
+            "desc": "Open Carbon Settings Hub",
             "glyph": "settings",
             "run": () => {
                 root.closeRequested()
-                Quickshell.execDetached(["python3", root.home + "/.config/hypr/scripts/carbon-config-editor.py"])
+                Quickshell.execDetached(["carbon-settings-hub"])
             }
         },
         {
@@ -489,7 +489,7 @@ Item {
                 { name: "Files",    icon: "folder",   appIcon: "org.gnome.Nautilus", cmd: "nautilus || dolphin" },
                 { name: "Discord",  icon: "forum",    appIcon: "discord", cmd: "discord" },
                 { name: "Code",     icon: "code",     appIcon: "com.visualstudio.code.oss", cmd: "code || vscodium" },
-                { name: "Config",   icon: "settings", appIcon: "carbon-settings", cmd: "carbon-config-editor || python3 " + root.home + "/.config/hypr/scripts/carbon-config-editor.py" }
+                { name: "Settings", icon: "settings", appIcon: "carbon-settings", cmd: "carbon-settings-hub" }
             ]
 
             delegate: Rectangle {
@@ -974,7 +974,7 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
                         root.closeRequested()
-                        Quickshell.execDetached(["python3", root.home + "/.config/hypr/scripts/carbon-config-editor.py"])
+                        Quickshell.execDetached(["carbon-settings-hub"])
                     }
                 }
             }
