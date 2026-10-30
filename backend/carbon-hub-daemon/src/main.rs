@@ -56,7 +56,10 @@ struct HubResponse {
 }
 
 fn home_dir() -> PathBuf {
-    env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("/home/shogun"))
+    env::var("HOME")
+        .map(PathBuf::from)
+        .or_else(|_| env::var("USER").map(|u| PathBuf::from(format!("/home/{}", u))))
+        .unwrap_or_else(|_| PathBuf::from("."))
 }
 
 fn config_dir() -> PathBuf {
@@ -70,7 +73,17 @@ fn config_dir() -> PathBuf {
 // ---------------------------------------------------------------------------
 async fn get_hypr_socket_path() -> Option<PathBuf> {
     let sig = env::var("HYPRLAND_INSTANCE_SIGNATURE").ok()?;
-    let xdg = env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/run/user/1000".to_string());
+    let xdg = env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| {
+        if let Ok(out) = std::process::Command::new("id").arg("-u").output() {
+            if let Ok(uid_str) = String::from_utf8(out.stdout) {
+                let uid = uid_str.trim();
+                if !uid.is_empty() {
+                    return format!("/run/user/{}", uid);
+                }
+            }
+        }
+        "/tmp".to_string()
+    });
     let p = PathBuf::from(xdg).join("hypr").join(sig).join(".socket.sock");
     if p.exists() {
         Some(p)
@@ -457,6 +470,42 @@ async fn set_temperature(temp: i64) {
     }
 }
 
+async fn resolve_monitor_defaults(req_mon: Option<String>, req_w: Option<i64>, req_h: Option<i64>) -> (String, i64, i64) {
+    let monitors = get_hypr_monitors().await;
+    let mut resolved_name = req_mon;
+    let mut resolved_w = req_w;
+    let mut resolved_h = req_h;
+
+    if let Some(arr) = monitors.as_array() {
+        let target = if let Some(ref m_name) = resolved_name {
+            arr.iter().find(|m| m.get("name").and_then(|v| v.as_str()) == Some(m_name))
+        } else {
+            arr.iter().find(|m| m.get("focused").and_then(|v| v.as_bool()).unwrap_or(false))
+                .or_else(|| arr.first())
+        };
+
+        if let Some(target) = target {
+            if resolved_name.is_none() {
+                if let Some(n) = target.get("name").and_then(|v| v.as_str()) {
+                    resolved_name = Some(n.to_string());
+                }
+            }
+            if resolved_w.is_none() {
+                resolved_w = target.get("width").and_then(|v| v.as_i64());
+            }
+            if resolved_h.is_none() {
+                resolved_h = target.get("height").and_then(|v| v.as_i64());
+            }
+        }
+    }
+
+    (
+        resolved_name.unwrap_or_else(|| "default".into()),
+        resolved_w.unwrap_or(1920),
+        resolved_h.unwrap_or(1080),
+    )
+}
+
 async fn set_shell_scale(scale: f64) -> Result<(), String> {
     let cfg = config_dir();
     let bar_pos_file = cfg.join("carbon-bar-position.json");
@@ -723,9 +772,7 @@ async fn handle_request(req: HubRequest) -> HubResponse {
             }
         }
         "set_resolution" => {
-            let mon = req.monitor.unwrap_or_else(|| "eDP-1".into());
-            let w = req.w.unwrap_or(1366);
-            let h = req.h.unwrap_or(768);
+            let (mon, w, h) = resolve_monitor_defaults(req.monitor, req.w, req.h).await;
             let rate = req.rate;
             match set_monitor_resolution(&mon, w, h, rate).await {
                 Ok(_) => HubResponse {
@@ -745,7 +792,7 @@ async fn handle_request(req: HubRequest) -> HubResponse {
             }
         }
         "set_orientation" => {
-            let mon = req.monitor.unwrap_or_else(|| "eDP-1".into());
+            let (mon, _, _) = resolve_monitor_defaults(req.monitor, None, None).await;
             let transform = req.transform.or_else(|| req.value.and_then(|v| v.as_i64())).unwrap_or(0);
             match set_monitor_orientation(&mon, transform).await {
                 Ok(_) => HubResponse {
@@ -765,7 +812,7 @@ async fn handle_request(req: HubRequest) -> HubResponse {
             }
         }
         "set_scale" => {
-            let mon = req.monitor.unwrap_or_else(|| "eDP-1".into());
+            let (mon, _, _) = resolve_monitor_defaults(req.monitor, None, None).await;
             let scale = req.scale.or_else(|| req.value.and_then(|v| v.as_f64())).unwrap_or(1.0);
             match set_monitor_scale(&mon, scale).await {
                 Ok(_) => HubResponse {

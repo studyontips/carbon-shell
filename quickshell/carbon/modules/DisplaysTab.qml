@@ -12,22 +12,53 @@ Item {
     implicitWidth: 800
     implicitHeight: 600
 
-    property string selectedMonitor: "DP-1"
+    property string selectedMonitor: ""
     property var monitorsList: []
     
-    // Active monitor properties
+    // Active selected monitor properties
     property int monitorWidth: 1366
     property int monitorHeight: 768
     property real monitorRate: 60.0
     property int monitorTransform: 0 // 0: Landscape, 1: Portrait (90 deg), 2: Inverted, 3: Portrait (270 deg)
     property real monitorScale: 1.0
 
-    // Secondary monitor properties (e.g. DP-1 standby/external)
-    property int dp1Width: 1920
-    property int dp1Height: 1080
-    property real dp1Rate: 120.0
-    property int dp1Transform: 1
-    property real dp1Scale: 1.0
+    function syncActiveMonitor() {
+        if (!root.monitorsList || root.monitorsList.length === 0) return
+        var found = null
+        for (var i = 0; i < root.monitorsList.length; i++) {
+            if (root.monitorsList[i].name === root.selectedMonitor) {
+                found = root.monitorsList[i]
+                break
+            }
+        }
+        if (!found) {
+            found = root.monitorsList[0]
+            root.selectedMonitor = found.name
+        }
+        root.monitorWidth = found.width || 1366
+        root.monitorHeight = found.height || 768
+        root.monitorRate = found.refreshRate || 60.0
+        root.monitorTransform = found.transform || 0
+        root.monitorScale = found.scale || 1.0
+        root.vrrEnabled = (found.vrr === true || found.vrr === 1)
+    }
+
+    onSelectedMonitorChanged: root.syncActiveMonitor()
+
+    function updateMonitorInList(name, patch) {
+        var list = []
+        for (var i = 0; i < root.monitorsList.length; i++) {
+            var item = Object.assign({}, root.monitorsList[i])
+            if (item.name === name) {
+                for (var key in patch) {
+                    item[key] = patch[key]
+                }
+            }
+            list.push(item)
+        }
+        root.monitorsList = list
+        root.syncActiveMonitor()
+    }
 
     // Global & Hardware states
     property real globalShellScale: (Theme && Theme.shellScale !== undefined) ? Theme.shellScale : 1.0
@@ -64,18 +95,7 @@ Item {
                             var arr = resp.data
                             if (Array.isArray(arr) && arr.length > 0) {
                                 root.monitorsList = arr
-                                for (var i = 0; i < arr.length; i++) {
-                                    var m = arr[i]
-                                    if (m.name === root.selectedMonitor) {
-                                        root.monitorWidth = m.width || 1366
-                                        root.monitorHeight = m.height || 768
-                                        root.monitorRate = m.refreshRate || 60.0
-                                        root.monitorTransform = m.transform || 0
-                                        root.monitorScale = m.scale || 1.0
-                                        root.vrrEnabled = (m.vrr === true || m.vrr === 1)
-                                        break
-                                    }
-                                }
+                                root.syncActiveMonitor()
                             }
                         } else if (resp.action === "get_shell_scale" || resp.action === "set_shell_scale") {
                             if (resp.data && resp.data.scale !== undefined) {
@@ -83,18 +103,22 @@ Item {
                             }
                         } else if (resp.action === "set_orientation") {
                             if (resp.data && resp.data.transform !== undefined) {
-                                if (resp.data.monitor === "eDP-1") root.monitorTransform = resp.data.transform
-                                else if (resp.data.monitor === "DP-1") root.dp1Transform = resp.data.transform
+                                var mon = resp.data.monitor || root.selectedMonitor
+                                root.updateMonitorInList(mon, { "transform": resp.data.transform })
                             }
                         } else if (resp.action === "set_resolution") {
                             if (resp.data) {
-                                if (resp.data.monitor === "eDP-1") {
-                                    if (resp.data.w) root.monitorWidth = resp.data.w
-                                    if (resp.data.h) root.monitorHeight = resp.data.h
-                                } else if (resp.data.monitor === "DP-1") {
-                                    if (resp.data.w) root.dp1Width = resp.data.w
-                                    if (resp.data.h) root.dp1Height = resp.data.h
-                                }
+                                var mon = resp.data.monitor || root.selectedMonitor
+                                var patch = {}
+                                if (resp.data.w) patch["width"] = resp.data.w
+                                if (resp.data.h) patch["height"] = resp.data.h
+                                if (resp.data.rate) patch["refreshRate"] = resp.data.rate
+                                root.updateMonitorInList(mon, patch)
+                            }
+                        } else if (resp.action === "set_scale") {
+                            if (resp.data && resp.data.scale !== undefined) {
+                                var mon = resp.data.monitor || root.selectedMonitor
+                                root.updateMonitorInList(mon, { "scale": resp.data.scale })
                             }
                         } else if (resp.action === "set_vrr") {
                             if (resp.data && resp.data.state !== undefined) {
@@ -131,11 +155,11 @@ Item {
         id: scaleDebounce
         interval: 32
         repeat: false
-        onTriggered: root.sendHub({ "module": "display", "action": "set_scale", "monitor": root.selectedMonitor, "scale": root.selectedMonitor === "eDP-1" ? root.monitorScale : root.dp1Scale })
+        onTriggered: root.sendHub({ "module": "display", "action": "set_scale", "monitor": root.selectedMonitor, "scale": root.monitorScale })
     }
     function queueScale(val) {
-        if (root.selectedMonitor === "eDP-1") root.monitorScale = val
-        else root.dp1Scale = val
+        root.monitorScale = val
+        root.updateMonitorInList(root.selectedMonitor, { "scale": val })
         scaleDebounce.restart()
     }
 
@@ -246,204 +270,113 @@ Item {
                     anchors.centerIn: parent
                     spacing: 28
 
-                    // -----------------------------------------------------------
-                    // Node 1: eDP-1 (Active / Primary Laptop Display)
-                    // -----------------------------------------------------------
-                    Item {
-                        id: edp1Container
-                        readonly property bool isPortrait: (root.monitorTransform === 1 || root.monitorTransform === 3)
-                        readonly property bool isSelected: root.selectedMonitor === "eDP-1"
-                        
-                        // Original shape and aspect ratio
-                        width: isPortrait ? 104 : 188
-                        height: isPortrait ? 164 : 104
+                    Repeater {
+                        model: root.monitorsList
 
-                        scale: edp1Mouse.pressed ? 0.97 : (edp1Mouse.containsMouse ? 1.03 : 1.0)
+                        delegate: Item {
+                            id: monitorContainer
+                            required property var modelData
+                            required property int index
 
-                        Behavior on width {
-                            NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
-                        }
-                        Behavior on height {
-                            NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
-                        }
-                        Behavior on scale {
-                            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-                        }
+                            readonly property bool isPortrait: (modelData.transform === 1 || modelData.transform === 3)
+                            readonly property bool isSelected: root.selectedMonitor === modelData.name
 
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 12
-                            clip: true
-                            color: Qt.rgba(0.06, 0.06, 0.08, 0.85)
-                            border.width: edp1Container.isSelected ? 1.5 : 1
-                            border.color: edp1Container.isSelected ? Theme.primary : (edp1Mouse.containsMouse ? Qt.rgba(1, 1, 1, 0.30) : Qt.rgba(1, 1, 1, 0.12))
+                            // Original shape and aspect ratio
+                            width: isPortrait ? 104 : 188
+                            height: isPortrait ? 164 : 104
 
-                            Behavior on border.color { ColorAnimation { duration: 200 } }
-                            Behavior on color { ColorAnimation { duration: 200 } }
+                            scale: monitorMouse.pressed ? 0.97 : (monitorMouse.containsMouse ? 1.03 : 1.0)
 
-                            // Glowing ambient halo when selected
+                            Behavior on width {
+                                NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
+                            }
+                            Behavior on height {
+                                NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
+                            }
+                            Behavior on scale {
+                                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                            }
+
                             Rectangle {
                                 anchors.fill: parent
-                                anchors.margins: -1
-                                radius: 13
-                                color: "transparent"
-                                border.width: 1
-                                border.color: edp1Container.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40) : "transparent"
-                                opacity: edp1Container.isSelected ? 1 : 0
-                                Behavior on opacity { NumberAnimation { duration: 250 } }
-                            }
+                                radius: 12
+                                clip: true
+                                color: Qt.rgba(0.06, 0.06, 0.08, 0.85)
+                                border.width: monitorContainer.isSelected ? 1.5 : 1
+                                border.color: monitorContainer.isSelected ? Theme.primary : (monitorMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.30) : Qt.rgba(1, 1, 1, 0.12))
 
-                            // Content inside node stays strictly upright & horizontal (NO rotation)
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: 3
+                                Behavior on border.color { ColorAnimation { duration: 200 } }
+                                Behavior on color { ColorAnimation { duration: 200 } }
 
-                                Text {
-                                    text: "eDP-1"
-                                    font.family: Theme.font
-                                    font.pixelSize: Theme.fontPx(13)
-                                    font.weight: Font.Bold
-                                    color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.90)
-                                    Layout.alignment: Qt.AlignHCenter
-                                }
-
-                                Text {
-                                    text: root.monitorWidth + " × " + root.monitorHeight
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontPx(10)
-                                    color: Qt.rgba(1, 1, 1, 0.60)
-                                    Layout.alignment: Qt.AlignHCenter
-                                }
-
-                                Text {
-                                    text: Math.round(root.monitorRate) + "Hz  •  " + (edp1Container.isPortrait ? "Portrait" : "Landscape")
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: edp1Container.isPortrait ? Theme.fontPx(7.5) : Theme.fontPx(9)
-                                    color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
-                                    Layout.alignment: Qt.AlignHCenter
-                                }
-
+                                // Glowing ambient halo when selected
                                 Rectangle {
-                                    Layout.preferredWidth: 68
-                                    Layout.preferredHeight: 16
-                                    radius: 6
-                                    color: edp1Container.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) : Qt.rgba(1, 1, 1, 0.06)
-                                    Layout.alignment: Qt.AlignHCenter
+                                    anchors.fill: parent
+                                    anchors.margins: -1
+                                    radius: 13
+                                    color: "transparent"
+                                    border.width: 1
+                                    border.color: monitorContainer.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40) : "transparent"
+                                    opacity: monitorContainer.isSelected ? 1 : 0
+                                    Behavior on opacity { NumberAnimation { duration: 250 } }
+                                }
 
-                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                // Content inside node stays strictly upright & horizontal (NO rotation)
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    spacing: 3
 
                                     Text {
-                                        anchors.centerIn: parent
-                                        text: "PRIMARY"
-                                        font.family: Theme.fontMono
-                                        font.pixelSize: Theme.fontPx(8)
+                                        text: modelData.name
+                                        font.family: Theme.font
+                                        font.pixelSize: Theme.fontPx(13)
                                         font.weight: Font.Bold
-                                        color: edp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
+                                        color: monitorContainer.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.90)
+                                        Layout.alignment: Qt.AlignHCenter
                                     }
-                                }
-                            }
-
-                            MouseArea {
-                                id: edp1Mouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.selectedMonitor = "eDP-1"
-                            }
-                        }
-                    }
-
-                    // -----------------------------------------------------------
-                    // Node 2: DP-1 (Secondary / External Node)
-                    // -----------------------------------------------------------
-                    Item {
-                        id: dp1Container
-                        readonly property bool isPortrait: (root.dp1Transform === 1 || root.dp1Transform === 3)
-                        readonly property bool isSelected: root.selectedMonitor === "DP-1"
-                        
-                        // Original shape and aspect ratio
-                        width: isPortrait ? 104 : 188
-                        height: isPortrait ? 164 : 104
-
-                        scale: dp1Mouse.pressed ? 0.97 : (dp1Mouse.containsMouse ? 1.03 : 1.0)
-
-                        Behavior on width {
-                            NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
-                        }
-                        Behavior on height {
-                            NumberAnimation { duration: 400; easing.type: Easing.InOutExpo }
-                        }
-                        Behavior on scale {
-                            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-                        }
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 12
-                            clip: true
-                            color: Qt.rgba(0.06, 0.06, 0.08, 0.85)
-                            border.width: dp1Container.isSelected ? 1.5 : 1
-                            border.color: dp1Container.isSelected ? Theme.primary : (dp1Mouse.containsMouse ? Qt.rgba(1, 1, 1, 0.30) : Qt.rgba(1, 1, 1, 0.12))
-
-                            Behavior on border.color { ColorAnimation { duration: 200 } }
-                            Behavior on color { ColorAnimation { duration: 200 } }
-
-                            // Content inside node stays strictly upright & horizontal (NO rotation)
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: 3
-
-                                Text {
-                                    text: "DP-1"
-                                    font.family: Theme.font
-                                    font.pixelSize: Theme.fontPx(13)
-                                    font.weight: Font.Bold
-                                    color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.90)
-                                    Layout.alignment: Qt.AlignHCenter
-                                }
-
-                                Text {
-                                    text: root.dp1Width + " × " + root.dp1Height
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontPx(10)
-                                    color: Qt.rgba(1, 1, 1, 0.60)
-                                    Layout.alignment: Qt.AlignHCenter
-                                }
-
-                                Text {
-                                    text: Math.round(root.dp1Rate) + "Hz  •  " + (dp1Container.isPortrait ? "Portrait" : "Landscape")
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: dp1Container.isPortrait ? Theme.fontPx(7.5) : Theme.fontPx(9)
-                                    color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
-                                    Layout.alignment: Qt.AlignHCenter
-                                }
-
-                                Rectangle {
-                                    Layout.preferredWidth: 72
-                                    Layout.preferredHeight: 16
-                                    radius: 6
-                                    color: dp1Container.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) : Qt.rgba(1, 1, 1, 0.06)
-                                    Layout.alignment: Qt.AlignHCenter
-
-                                    Behavior on color { ColorAnimation { duration: 150 } }
 
                                     Text {
-                                        anchors.centerIn: parent
-                                        text: "EXT // STANDBY"
+                                        text: (modelData.width || 1920) + " × " + (modelData.height || 1080)
                                         font.family: Theme.fontMono
-                                        font.pixelSize: Theme.fontPx(8)
-                                        font.weight: Font.Bold
-                                        color: dp1Container.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
+                                        font.pixelSize: Theme.fontPx(10)
+                                        color: Qt.rgba(1, 1, 1, 0.60)
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+
+                                    Text {
+                                        text: Math.round(modelData.refreshRate || 60) + "Hz  •  " + (monitorContainer.isPortrait ? "Portrait" : "Landscape")
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: monitorContainer.isPortrait ? Theme.fontPx(7.5) : Theme.fontPx(9)
+                                        color: monitorContainer.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+
+                                    Rectangle {
+                                        Layout.preferredWidth: (modelData.focused || index === 0) ? 68 : 72
+                                        Layout.preferredHeight: 16
+                                        radius: 6
+                                        color: monitorContainer.isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) : Qt.rgba(1, 1, 1, 0.06)
+                                        Layout.alignment: Qt.AlignHCenter
+
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: (modelData.focused || index === 0) ? "PRIMARY" : "EXT // STANDBY"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontPx(8)
+                                            font.weight: Font.Bold
+                                            color: monitorContainer.isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
+                                        }
                                     }
                                 }
-                            }
 
-                            MouseArea {
-                                id: dp1Mouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.selectedMonitor = "DP-1"
+                                MouseArea {
+                                    id: monitorMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.selectedMonitor = modelData.name
+                                }
                             }
                         }
                     }
@@ -512,7 +445,7 @@ Item {
                                 anchors.margins: 3
                                 spacing: 4
 
-                                readonly property bool isCurrentPortrait: root.selectedMonitor === "eDP-1" ? (root.monitorTransform === 1 || root.monitorTransform === 3) : (root.dp1Transform === 1 || root.dp1Transform === 3)
+                                readonly property bool isCurrentPortrait: (root.monitorTransform === 1 || root.monitorTransform === 3)
 
                                 Rectangle {
                                     Layout.fillWidth: true
@@ -543,8 +476,8 @@ Item {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            if (root.selectedMonitor === "eDP-1") root.monitorTransform = 0
-                                            else root.dp1Transform = 0
+                                            root.monitorTransform = 0
+                                            root.updateMonitorInList(root.selectedMonitor, { "transform": 0 })
                                             root.sendHub({ "module": "display", "action": "set_orientation", "monitor": root.selectedMonitor, "transform": 0 })
                                         }
                                     }
@@ -579,8 +512,8 @@ Item {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            if (root.selectedMonitor === "eDP-1") root.monitorTransform = 1
-                                            else root.dp1Transform = 1
+                                            root.monitorTransform = 1
+                                            root.updateMonitorInList(root.selectedMonitor, { "transform": 1 })
                                             root.sendHub({ "module": "display", "action": "set_orientation", "monitor": root.selectedMonitor, "transform": 1 })
                                         }
                                     }
@@ -623,7 +556,7 @@ Item {
                                         anchors.leftMargin: 12
                                         anchors.rightMargin: 12
                                         verticalAlignment: TextInput.AlignVCenter
-                                        text: String(root.selectedMonitor === "eDP-1" ? root.monitorWidth : root.dp1Width)
+                                        text: String(root.monitorWidth)
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontPx(12)
                                         color: Qt.rgba(1, 1, 1, 0.90)
@@ -631,8 +564,8 @@ Item {
                                         onEditingFinished: {
                                             var val = parseInt(text)
                                             if (val > 0) {
-                                                if (root.selectedMonitor === "eDP-1") root.monitorWidth = val
-                                                else root.dp1Width = val
+                                                root.monitorWidth = val
+                                                root.updateMonitorInList(root.selectedMonitor, { "width": val })
                                                 root.sendHub({ "module": "display", "action": "set_resolution", "monitor": root.selectedMonitor, "w": val, "h": parseInt(resHInput.text) })
                                             }
                                         }
@@ -671,7 +604,7 @@ Item {
                                         anchors.leftMargin: 12
                                         anchors.rightMargin: 12
                                         verticalAlignment: TextInput.AlignVCenter
-                                        text: String(root.selectedMonitor === "eDP-1" ? root.monitorHeight : root.dp1Height)
+                                        text: String(root.monitorHeight)
                                         font.family: Theme.fontMono
                                         font.pixelSize: Theme.fontPx(12)
                                         color: Qt.rgba(1, 1, 1, 0.90)
@@ -679,8 +612,8 @@ Item {
                                         onEditingFinished: {
                                             var val = parseInt(text)
                                             if (val > 0) {
-                                                if (root.selectedMonitor === "eDP-1") root.monitorHeight = val
-                                                else root.dp1Height = val
+                                                root.monitorHeight = val
+                                                root.updateMonitorInList(root.selectedMonitor, { "height": val })
                                                 root.sendHub({ "module": "display", "action": "set_resolution", "monitor": root.selectedMonitor, "w": parseInt(resWInput.text), "h": val })
                                             }
                                         }
@@ -696,7 +629,7 @@ Item {
                             }
                         }
 
-                        // Refresh Rate Flush Buttons: [ 48Hz ] [ 60Hz ] [ 120Hz ] [ 144Hz ]
+                        // Refresh Rate Flush Buttons
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 6
@@ -713,10 +646,32 @@ Item {
                                 Layout.fillWidth: true
                                 spacing: 8
 
-                                readonly property real currentRate: root.selectedMonitor === "eDP-1" ? root.monitorRate : root.dp1Rate
+                                readonly property real currentRate: root.monitorRate
+                                readonly property var availableRates: {
+                                    for (var i = 0; i < root.monitorsList.length; i++) {
+                                        var m = root.monitorsList[i]
+                                        if (m.name === root.selectedMonitor && m.availableModes && Array.isArray(m.availableModes)) {
+                                            var rates = []
+                                            for (var j = 0; j < m.availableModes.length; j++) {
+                                                var parts = String(m.availableModes[j]).split("@")
+                                                if (parts.length > 1) {
+                                                    var r = Math.round(parseFloat(parts[1]))
+                                                    if (!isNaN(r) && r > 0 && rates.indexOf(r) === -1) {
+                                                        rates.push(r)
+                                                    }
+                                                }
+                                            }
+                                            if (rates.length > 0) {
+                                                rates.sort(function(a, b) { return a - b })
+                                                return rates
+                                            }
+                                        }
+                                    }
+                                    return [48, 60, 120, 144]
+                                }
 
                                 Repeater {
-                                    model: [48, 60, 120, 144]
+                                    model: parent.availableRates
 
                                     delegate: Rectangle {
                                         Layout.fillWidth: true
@@ -748,9 +703,9 @@ Item {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                if (root.selectedMonitor === "eDP-1") root.monitorRate = modelData
-                                                else root.dp1Rate = modelData
-                                                root.sendHub({ "module": "display", "action": "set_resolution", "monitor": root.selectedMonitor, "w": root.selectedMonitor === "eDP-1" ? root.monitorWidth : root.dp1Width, "h": root.selectedMonitor === "eDP-1" ? root.monitorHeight : root.dp1Height, "rate": modelData })
+                                                root.monitorRate = modelData
+                                                root.updateMonitorInList(root.selectedMonitor, { "refreshRate": modelData })
+                                                root.sendHub({ "module": "display", "action": "set_resolution", "monitor": root.selectedMonitor, "w": root.monitorWidth, "h": root.monitorHeight, "rate": modelData })
                                             }
                                         }
                                     }
@@ -767,7 +722,7 @@ Item {
                             stepSize: 0.05
                             decimals: 2
                             unit: "x"
-                            value: root.selectedMonitor === "eDP-1" ? root.monitorScale : root.dp1Scale
+                            value: root.monitorScale
                             onMoved: (val) => root.queueScale(val)
                         }
                     }

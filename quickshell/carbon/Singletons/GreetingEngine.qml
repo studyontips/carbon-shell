@@ -17,7 +17,7 @@ import Quickshell
 Singleton {
     id: root
 
-    readonly property string userName: Quickshell.env("USER") || "shogun"
+    readonly property string userName: Quickshell.env("USER") || "user"
     readonly property var weekdays: [
         "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
     ]
