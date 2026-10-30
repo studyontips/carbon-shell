@@ -22,6 +22,24 @@ struct HubRequest {
     path: Option<String>,
     #[serde(default)]
     scheme: Option<String>,
+    #[serde(default)]
+    monitor: Option<String>,
+    #[serde(default)]
+    w: Option<i64>,
+    #[serde(default)]
+    h: Option<i64>,
+    #[serde(default)]
+    rate: Option<f64>,
+    #[serde(default)]
+    transform: Option<i64>,
+    #[serde(default)]
+    scale: Option<f64>,
+    #[serde(default)]
+    state: Option<i64>,
+    #[serde(default)]
+    temp: Option<i64>,
+    #[serde(default)]
+    feature: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -292,6 +310,154 @@ fn list_local_wallpapers() -> Value {
 }
 
 // ---------------------------------------------------------------------------
+// DISPLAY & MONITOR HANDLERS
+// ---------------------------------------------------------------------------
+async fn get_hypr_monitors() -> Value {
+    if let Ok(raw) = send_raw_hypr_cmd("j/monitors").await {
+        if let Ok(parsed) = serde_json::from_str::<Value>(&raw) {
+            return parsed;
+        }
+    }
+    if let Ok(out) = Command::new("hyprctl").args(["monitors", "-j"]).output().await {
+        if let Ok(parsed) = serde_json::from_slice::<Value>(&out.stdout) {
+            return parsed;
+        }
+    }
+    json!([])
+}
+
+async fn set_monitor_resolution(name: &str, w: i64, h: i64, rate: Option<f64>) -> Result<(), String> {
+    let monitors = get_hypr_monitors().await;
+    let mut current_pos = "auto".to_string();
+    let mut current_scale = 1.0;
+    let mut current_transform = 0;
+    let mut current_rate = 60.0;
+
+    if let Some(arr) = monitors.as_array() {
+        for m in arr {
+            if m.get("name").and_then(|v| v.as_str()) == Some(name) {
+                if let (Some(x), Some(y)) = (m.get("x").and_then(|v| v.as_i64()), m.get("y").and_then(|v| v.as_i64())) {
+                    current_pos = format!("{}x{}", x, y);
+                }
+                if let Some(s) = m.get("scale").and_then(|v| v.as_f64()) {
+                    current_scale = s;
+                }
+                if let Some(t) = m.get("transform").and_then(|v| v.as_i64()) {
+                    current_transform = t;
+                }
+                if let Some(r) = m.get("refreshRate").and_then(|v| v.as_f64()) {
+                    current_rate = r;
+                }
+                break;
+            }
+        }
+    }
+
+    let hz = rate.unwrap_or(current_rate);
+    let mode = format!("{}x{}@{:.0}", w, h, hz);
+    
+    let lua_cmd = format!(
+        "eval hl.monitor({{ output = \"{}\", mode = \"{}\", position = \"{}\", scale = {}, transform = {} }})",
+        name, mode, current_pos, current_scale, current_transform
+    );
+    let res = send_raw_hypr_cmd(&lua_cmd).await;
+    let fallback_cmd = format!("keyword monitor {},{},{},{},transform,{}", name, mode, current_pos, current_scale, current_transform);
+    let _ = send_raw_hypr_cmd(&fallback_cmd).await;
+    res.map(|_| ())
+}
+
+async fn set_monitor_orientation(name: &str, transform: i64) -> Result<(), String> {
+    let monitors = get_hypr_monitors().await;
+    let mut current_mode = "preferred".to_string();
+    let mut current_pos = "auto".to_string();
+    let mut current_scale = 1.0;
+
+    if let Some(arr) = monitors.as_array() {
+        for m in arr {
+            if m.get("name").and_then(|v| v.as_str()) == Some(name) {
+                if let (Some(w), Some(h), Some(r)) = (
+                    m.get("width").and_then(|v| v.as_i64()),
+                    m.get("height").and_then(|v| v.as_i64()),
+                    m.get("refreshRate").and_then(|v| v.as_f64()),
+                ) {
+                    current_mode = format!("{}x{}@{:.0}", w, h, r);
+                }
+                if let (Some(x), Some(y)) = (m.get("x").and_then(|v| v.as_i64()), m.get("y").and_then(|v| v.as_i64())) {
+                    current_pos = format!("{}x{}", x, y);
+                }
+                if let Some(s) = m.get("scale").and_then(|v| v.as_f64()) {
+                    current_scale = s;
+                }
+                break;
+            }
+        }
+    }
+
+    let lua_cmd = format!(
+        "eval hl.monitor({{ output = \"{}\", mode = \"{}\", position = \"{}\", scale = {}, transform = {} }})",
+        name, current_mode, current_pos, current_scale, transform
+    );
+    let res = send_raw_hypr_cmd(&lua_cmd).await;
+    let fallback_cmd = format!("keyword monitor {},{},{},{},transform,{}", name, current_mode, current_pos, current_scale, transform);
+    let _ = send_raw_hypr_cmd(&fallback_cmd).await;
+    res.map(|_| ())
+}
+
+async fn set_monitor_scale(name: &str, scale: f64) -> Result<(), String> {
+    let monitors = get_hypr_monitors().await;
+    let mut current_mode = "preferred".to_string();
+    let mut current_pos = "auto".to_string();
+    let mut current_transform = 0;
+
+    if let Some(arr) = monitors.as_array() {
+        for m in arr {
+            if m.get("name").and_then(|v| v.as_str()) == Some(name) {
+                if let (Some(w), Some(h), Some(r)) = (
+                    m.get("width").and_then(|v| v.as_i64()),
+                    m.get("height").and_then(|v| v.as_i64()),
+                    m.get("refreshRate").and_then(|v| v.as_f64()),
+                ) {
+                    current_mode = format!("{}x{}@{:.0}", w, h, r);
+                }
+                if let (Some(x), Some(y)) = (m.get("x").and_then(|v| v.as_i64()), m.get("y").and_then(|v| v.as_i64())) {
+                    current_pos = format!("{}x{}", x, y);
+                }
+                if let Some(t) = m.get("transform").and_then(|v| v.as_i64()) {
+                    current_transform = t;
+                }
+                break;
+            }
+        }
+    }
+
+    let lua_cmd = format!(
+        "eval hl.monitor({{ output = \"{}\", mode = \"{}\", position = \"{}\", scale = {:.2}, transform = {} }})",
+        name, current_mode, current_pos, scale, current_transform
+    );
+    let res = send_raw_hypr_cmd(&lua_cmd).await;
+    let fallback_cmd = format!("keyword monitor {},{},{},{:.2},transform,{}", name, current_mode, current_pos, scale, current_transform);
+    let _ = send_raw_hypr_cmd(&fallback_cmd).await;
+    res.map(|_| ())
+}
+
+async fn set_vrr(state: i64) -> Result<(), String> {
+    let lua_cmd = format!("eval hl.config({{ misc = {{ vrr = {} }} }})", state);
+    let res = send_raw_hypr_cmd(&lua_cmd).await;
+    let fallback_cmd = format!("keyword misc:vrr {}", state);
+    let _ = send_raw_hypr_cmd(&fallback_cmd).await;
+    res.map(|_| ())
+}
+
+async fn set_temperature(temp: i64) {
+    if temp >= 6500 {
+        let _ = Command::new("pkill").args(["-x", "hyprsunset"]).spawn();
+    } else {
+        let _ = Command::new("pkill").args(["-x", "hyprsunset"]).status().await;
+        let _ = Command::new("hyprsunset").arg("-t").arg(temp.to_string()).spawn();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // MESSAGE ROUTER
 // ---------------------------------------------------------------------------
 async fn handle_request(req: HubRequest) -> HubResponse {
@@ -505,6 +671,122 @@ async fn handle_request(req: HubRequest) -> HubResponse {
                 status: "ok".into(),
                 action: Some(action),
                 data: Some(list),
+                error: None,
+                elapsed_us: Some(t0.elapsed().as_micros()),
+            }
+        }
+        "get_monitors" => {
+            let monitors = get_hypr_monitors().await;
+            HubResponse {
+                status: "ok".into(),
+                action: Some(action),
+                data: Some(monitors),
+                error: None,
+                elapsed_us: Some(t0.elapsed().as_micros()),
+            }
+        }
+        "set_resolution" => {
+            let mon = req.monitor.unwrap_or_else(|| "eDP-1".into());
+            let w = req.w.unwrap_or(1366);
+            let h = req.h.unwrap_or(768);
+            let rate = req.rate;
+            match set_monitor_resolution(&mon, w, h, rate).await {
+                Ok(_) => HubResponse {
+                    status: "ok".into(),
+                    action: Some(action),
+                    data: Some(json!({ "monitor": mon, "w": w, "h": h, "rate": rate })),
+                    error: None,
+                    elapsed_us: Some(t0.elapsed().as_micros()),
+                },
+                Err(e) => HubResponse {
+                    status: "error".into(),
+                    action: Some(action),
+                    data: None,
+                    error: Some(e),
+                    elapsed_us: Some(t0.elapsed().as_micros()),
+                },
+            }
+        }
+        "set_orientation" => {
+            let mon = req.monitor.unwrap_or_else(|| "eDP-1".into());
+            let transform = req.transform.or_else(|| req.value.and_then(|v| v.as_i64())).unwrap_or(0);
+            match set_monitor_orientation(&mon, transform).await {
+                Ok(_) => HubResponse {
+                    status: "ok".into(),
+                    action: Some(action),
+                    data: Some(json!({ "monitor": mon, "transform": transform })),
+                    error: None,
+                    elapsed_us: Some(t0.elapsed().as_micros()),
+                },
+                Err(e) => HubResponse {
+                    status: "error".into(),
+                    action: Some(action),
+                    data: None,
+                    error: Some(e),
+                    elapsed_us: Some(t0.elapsed().as_micros()),
+                },
+            }
+        }
+        "set_scale" => {
+            let mon = req.monitor.unwrap_or_else(|| "eDP-1".into());
+            let scale = req.scale.or_else(|| req.value.and_then(|v| v.as_f64())).unwrap_or(1.0);
+            match set_monitor_scale(&mon, scale).await {
+                Ok(_) => HubResponse {
+                    status: "ok".into(),
+                    action: Some(action),
+                    data: Some(json!({ "monitor": mon, "scale": scale })),
+                    error: None,
+                    elapsed_us: Some(t0.elapsed().as_micros()),
+                },
+                Err(e) => HubResponse {
+                    status: "error".into(),
+                    action: Some(action),
+                    data: None,
+                    error: Some(e),
+                    elapsed_us: Some(t0.elapsed().as_micros()),
+                },
+            }
+        }
+        "set_vrr" => {
+            let state = req.state.or_else(|| req.value.and_then(|v| v.as_i64())).unwrap_or(0);
+            match set_vrr(state).await {
+                Ok(_) => HubResponse {
+                    status: "ok".into(),
+                    action: Some(action),
+                    data: Some(json!({ "state": state })),
+                    error: None,
+                    elapsed_us: Some(t0.elapsed().as_micros()),
+                },
+                Err(e) => HubResponse {
+                    status: "error".into(),
+                    action: Some(action),
+                    data: None,
+                    error: Some(e),
+                    elapsed_us: Some(t0.elapsed().as_micros()),
+                },
+            }
+        }
+        "set_temperature" => {
+            let temp = req.temp.or_else(|| req.value.and_then(|v| v.as_i64())).unwrap_or(6500);
+            set_temperature(temp).await;
+            HubResponse {
+                status: "ok".into(),
+                action: Some(action),
+                data: Some(json!({ "temp": temp })),
+                error: None,
+                elapsed_us: Some(t0.elapsed().as_micros()),
+            }
+        }
+        "set_display_feature" => {
+            let feat = req.feature.unwrap_or_default();
+            let state = req.value.and_then(|v| v.as_bool()).unwrap_or(false);
+            if feat == "direct_scanout" {
+                let _ = send_raw_hypr_cmd(&format!("eval hl.config({{ render = {{ direct_scanout = {} }} }})", state)).await;
+            }
+            HubResponse {
+                status: "ok".into(),
+                action: Some(action),
+                data: Some(json!({ "feature": feat, "state": state })),
                 error: None,
                 elapsed_us: Some(t0.elapsed().as_micros()),
             }

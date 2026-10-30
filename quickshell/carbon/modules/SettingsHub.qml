@@ -224,10 +224,15 @@ Item {
                         visible: root.currentSection === "Appearance"
                     }
 
+                    DisplaysTab {
+                        anchors.fill: parent
+                        visible: root.currentSection === "Display"
+                    }
+
                     // Placeholder for other sections
                     Item {
                         anchors.fill: parent
-                        visible: root.currentSection !== "Appearance"
+                        visible: root.currentSection !== "Appearance" && root.currentSection !== "Display"
 
                         ColumnLayout {
                             anchors.centerIn: parent

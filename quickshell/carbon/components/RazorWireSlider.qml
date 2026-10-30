@@ -12,6 +12,9 @@ Item {
     property real stepSize: 1
     property string unit: ""
     property int decimals: 0
+    property bool useGradientTrack: false
+    property color gradientStart: "#E6F4F1"
+    property color gradientEnd: "#F5A623"
 
     signal moved(real val)
 
@@ -55,13 +58,21 @@ Item {
             readonly property real normVal: Math.max(0.0, Math.min(1.0, (root.value - root.from) / (root.to - root.from || 1)))
             readonly property real handleX: normVal * (trackContainer.width - 12)
 
-            // Inactive track (1px solid hairline)
+            // Inactive track (1px solid hairline or linear gradient)
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 height: 1
-                color: Qt.rgba(1, 1, 1, 0.12)
+                color: root.useGradientTrack ? "transparent" : Qt.rgba(1, 1, 1, 0.12)
+                gradient: root.useGradientTrack ? trackGrad : null
+
+                Gradient {
+                    id: trackGrad
+                    orientation: Gradient.Horizontal
+                    GradientStop { position: 0.0; color: root.gradientStart }
+                    GradientStop { position: 1.0; color: root.gradientEnd }
+                }
             }
 
             // Active track (1px glowing Theme.primary line)
