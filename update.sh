@@ -246,11 +246,9 @@ done
 
 # Deploy desktop entries
 mkdir -p "$HOME/.local/share/applications"
-if [[ -f "$REPO_DIR/assets/carbon-settings.desktop" ]]; then
-    cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-settings.desktop"
-    cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-settings-hub.desktop"
-    cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-config-editor.desktop"
-fi
+[[ -f "$REPO_DIR/assets/carbon-settings.desktop" ]] && cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-settings.desktop"
+[[ -f "$REPO_DIR/assets/carbon-config-editor.desktop" ]] && cp -f "$REPO_DIR/assets/carbon-config-editor.desktop" "$HOME/.local/share/applications/carbon-config-editor.desktop"
+rm -f "$HOME/.local/share/applications/carbon-settings-hub.desktop" 2>/dev/null || true
 
 # Synchronize binaries
 mkdir -p "$BIN_DIR"

@@ -40,6 +40,7 @@ hl.bind(mainMod .. " + " .. "SHIFT" .. " + Q", hl.dsp.exec_cmd("~/.config/hypr/s
 -- ==============================================================================
 -- Carbon Settings GUI
 hl.bind(mainMod .. " + comma", hl.dsp.exec_cmd(homeDir .. "/.config/carbon/scripts/carbon-settings-hub"))
+hl.bind(mainMod .. " + SHIFT + comma", hl.dsp.exec_cmd(homeDir .. "/.config/hypr/scripts/carbon-config-editor"))
 hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd(homeDir .. "/.config/carbon/scripts/carbon-settings-hub"))
 
 -- Carbon Pomodoro Timer

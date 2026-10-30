@@ -271,6 +271,18 @@ Item {
             }
         },
         {
+            id: "config_legacy",
+            title: "Carbon Config Editor (Classic)",
+            desc: "Advanced settings for wallpapers, gestures, and blank tiles",
+            glyph: "tune",
+            appIcon: "preferences-desktop-theme",
+            category: "Preferences",
+            run: () => {
+                root.closeRequested()
+                Quickshell.execDetached(["carbon-config-editor"])
+            }
+        },
+        {
             id: "terminal",
             title: "Open Terminal",
             desc: "Launch kitty terminal emulator",

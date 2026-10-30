@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Carbon Config Editor
+GenericName=Desktop Configuration
+Comment=Advanced settings for wallpapers, gestures, blank tiles, and bar modes
+Exec=carbon-config-editor
+Icon=preferences-desktop-theme
+Terminal=false
+Type=Application
+Categories=Settings;DesktopSettings;
+StartupNotify=true
+StartupWMClass=carbon-config-editor
