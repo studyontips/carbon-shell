@@ -60,30 +60,31 @@ Singleton {
         }
     }
 
+    Timer {
+        id: fetchDebounceTimer
+        interval: 120
+        repeat: false
+        onTriggered: root.fetchLyrics()
+    }
+
     onTrackTitleChanged: {
         root.lines = []
-        if (lyricsProc.running) lyricsProc.running = false
-        fetchLyrics()
+        fetchDebounceTimer.restart()
     }
     onTrackArtistChanged: {
         root.lines = []
-        if (lyricsProc.running) lyricsProc.running = false
-        fetchLyrics()
+        fetchDebounceTimer.restart()
     }
     onTotalLengthChanged: {
         if (root.totalLength > 10 && !root.hasLyrics && !lyricsProc.running) {
-            var key = root.trackTitle + "::" + root.trackArtist + "::" + (LockState.cairoRomanizeLyrics ? "rom" : "raw")
-            if (root.lastFetchedKey !== key) {
-                root.fetchLyrics()
-            }
+            fetchDebounceTimer.restart()
         }
     }
 
     function reloadLyrics() {
         root.lastFetchedKey = ""
         root.lines = []
-        if (lyricsProc.running) lyricsProc.running = false
-        root.fetchLyrics()
+        fetchDebounceTimer.restart()
     }
 
     function fetchLyrics() {
@@ -97,7 +98,10 @@ Singleton {
         var romanize = Boolean(LockState.cairoRomanizeLyrics)
         var key = title + "::" + artist + "::" + (romanize ? "rom" : "raw")
         if (root.lastFetchedKey === key && (root.lines.length > 0 || lyricsProc.running)) return
-        if (lyricsProc.running) return
+        if (lyricsProc.running) {
+            root.lastFetchedKey = key
+            return
+        }
 
         root.lastFetchedKey = key
         lyricsProc.requestedKey = key
@@ -138,8 +142,11 @@ Singleton {
         }
 
         onExited: function(code) {
-            if (requestedKey !== root.lastFetchedKey) {
-                console.log("[CairoLyricsService] Ignoring stale lyrics for:", requestedKey, "current:", root.lastFetchedKey)
+            var currentKey = root.trackTitle + "::" + root.trackArtist + "::" + (LockState.cairoRomanizeLyrics ? "rom" : "raw")
+            if (requestedKey !== currentKey) {
+                console.log("[CairoLyricsService] Completed stale fetch for:", requestedKey, "-> now fetching current:", currentKey)
+                root.lastFetchedKey = ""
+                fetchDebounceTimer.restart()
                 return
             }
             var out = (cairoStdio.text || "").trim()

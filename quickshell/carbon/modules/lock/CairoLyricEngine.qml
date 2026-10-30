@@ -261,7 +261,9 @@ Item {
     }
 
     function processLyrics() {
-        var rawLines = CairoLyricsService.lines || []
+        var rawLines = (CairoLyricsService.lines && CairoLyricsService.lines.length > 0)
+                        ? CairoLyricsService.lines
+                        : (LyricsService.lines || [])
         if (!rawLines || rawLines.length === 0) {
             root.allWords = []
             root.row0Word = null
@@ -405,6 +407,11 @@ Item {
 
     Connections {
         target: LyricsService
+        function onLinesChanged() {
+            if (!CairoLyricsService.lines || CairoLyricsService.lines.length === 0) {
+                root.processLyrics()
+            }
+        }
         function onTrackTitleChanged() {
             root.syncBaseTimeFromMpris()
             root.processLyrics()
