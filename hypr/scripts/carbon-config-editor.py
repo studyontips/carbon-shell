@@ -2599,10 +2599,64 @@ class ConfigEditorWindow(Adw.ApplicationWindow):
         self.update_tile_preview()
         return page
 
+    def notify_shell_blank_tile(self):
+        try:
+            import socket
+            sock_path = "/tmp/carbon-shell.sock"
+            if os.path.exists(sock_path):
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+                    s.settimeout(0.5)
+                    s.connect(sock_path)
+                    s.sendall(b"reload-blank-tile\n")
+        except Exception:
+            pass
+
     def save_tile_config(self):
         write_json(BLANK_TILE_CONFIG_PATH, self.tile_cfg)
         if BLANK_TILE_HYPR_PATH != BLANK_TILE_CONFIG_PATH:
             write_json(BLANK_TILE_HYPR_PATH, self.tile_cfg)
+        self.notify_shell_blank_tile()
+
+    def auto_apply_default_crop(self, image_path):
+        try:
+            from PIL import Image as PILImage
+            img = PILImage.open(image_path)
+            orig_w, orig_h = img.size
+            tile_aspect = 408.0 / 86.0
+            if (orig_w / orig_h) > tile_aspect:
+                crop_h = max(30, int(orig_h * 0.65))
+                crop_w = int(round(crop_h * tile_aspect))
+            else:
+                crop_w = max(30, int(orig_w * 0.85))
+                crop_h = int(round(crop_w / tile_aspect))
+            x1 = max(0, (orig_w - crop_w) // 2)
+            y1 = max(0, (orig_h - crop_h) // 2)
+            x2 = min(orig_w, x1 + crop_w)
+            y2 = min(orig_h, y1 + crop_h)
+
+            cropped = img.crop((x1, y1, x2, y2))
+            os.makedirs(CONFIG_DIR, exist_ok=True)
+            os.makedirs(HYPR_DIR, exist_ok=True)
+            cropped.save(BLANK_TILE_CROP_PATH, format="PNG")
+            if BLANK_TILE_HYPR_CROP_PATH != BLANK_TILE_CROP_PATH:
+                cropped.save(BLANK_TILE_HYPR_CROP_PATH, format="PNG")
+
+            self.tile_cfg = {
+                "enabled": True,
+                "imagePath": image_path,
+                "cropPath": BLANK_TILE_CROP_PATH,
+                "cropRect": {"x": x1, "y": y1, "width": x2 - x1, "height": y2 - y1},
+                "opacity": float(self.tile_cfg.get("opacity", 1.0)),
+                "timestamp": int(time.time() * 1000)
+            }
+            if hasattr(self, "sw_tile_enable"):
+                self.sw_tile_enable.set_active(True)
+            self.save_tile_config()
+            self.update_tile_preview()
+            cr = self.tile_cfg["cropRect"]
+            self.lbl_crop_desc.set_text(f"{cr['width']}×{cr['height']} px at ({cr['x']}, {cr['y']})")
+        except Exception as e:
+            print("[BlankTile] Auto crop error:", e)
 
     def update_tile_preview(self):
         if not hasattr(self, "preview_picture") or not hasattr(self, "preview_placeholder"):
@@ -2642,6 +2696,7 @@ class ConfigEditorWindow(Adw.ApplicationWindow):
                         self.tile_cfg["imagePath"] = path
                         self.lbl_img_path.set_text(os.path.basename(path))
                         self.btn_crop.set_sensitive(True)
+                        self.auto_apply_default_crop(path)
                         self.on_open_tile_cropper(None)
             except Exception:
                 pass

@@ -23,6 +23,7 @@ ShellRoot {
     property bool launcherOpen: false
     property bool wallpaperPickerOpen: false
     property bool settingsHubOpen: false
+    property string settingsHubActiveTab: "Appearance"
     property real shellScale: (Theme && Theme.shellScale !== undefined) ? Theme.shellScale : 1.0
     property string wallpaperSource: "local"
     property var wallpaperModItem: null
@@ -1497,8 +1498,18 @@ ShellRoot {
                     else if (cmd === "settings" || cmd === "toggle-settings" || cmd === "open-settings") {
                         root.toggleSettingsHub()
                     }
+                    else if (cmd.startsWith("settings-tab ")) {
+                        var tabName = cmd.replace(/^settings-tab\s+/, "").trim()
+                        if (tabName.length > 0) root.settingsHubActiveTab = tabName
+                        root.openSettingsHub()
+                    }
                     else if (cmd === "close-settings") {
                         root.closeSettingsHub()
+                    }
+                    else if (cmd === "reload-blank-tile") {
+                        if (root.nucleusHubItem && root.nucleusHubItem.reloadBlankTileConfig) {
+                            root.nucleusHubItem.reloadBlankTileConfig()
+                        }
                     }
                     else if (cmd.startsWith("freeze-start ")) {
                         var fpath = cmd.replace(/^freeze-start\s+/, "").trim()
@@ -3934,8 +3945,19 @@ ShellRoot {
             visible: root.settingsHubOpen
 
             SettingsHub {
+                id: hubInst
                 anchors.fill: parent
                 open: root.settingsHubOpen
+                Binding {
+                    target: hubInst
+                    property: "currentSection"
+                    value: root.settingsHubActiveTab
+                }
+                onCurrentSectionChanged: {
+                    if (root.settingsHubActiveTab !== currentSection) {
+                        root.settingsHubActiveTab = currentSection
+                    }
+                }
                 onCloseRequested: root.closeSettingsHub()
             }
         }

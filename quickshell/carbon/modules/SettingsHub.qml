@@ -229,17 +229,27 @@ Item {
                         visible: root.currentSection === "Display"
                     }
 
-                    // Placeholder for other sections
+                    AudioTab {
+                        anchors.fill: parent
+                        visible: root.currentSection === "Audio"
+                    }
+
+                    NetworkTab {
+                        anchors.fill: parent
+                        visible: root.currentSection === "Network"
+                    }
+
+                    // Placeholder for other sections (e.g. System)
                     Item {
                         anchors.fill: parent
-                        visible: root.currentSection !== "Appearance" && root.currentSection !== "Display"
+                        visible: root.currentSection === "System"
 
                         ColumnLayout {
                             anchors.centerIn: parent
                             spacing: 8
 
                             Text {
-                                text: root.currentSection.toUpperCase() + " SETTINGS"
+                                text: "SYSTEM TELEMETRY"
                                 font.family: Theme.font
                                 font.pixelSize: Theme.fontPx(14)
                                 font.weight: Font.Bold

@@ -57,3 +57,5 @@ ControlHub ControlHub.qml
 AppearanceTab AppearanceTab.qml
 SettingsHub SettingsHub.qml
 DisplaysTab DisplaysTab.qml
+AudioTab AudioTab.qml
+NetworkTab NetworkTab.qml

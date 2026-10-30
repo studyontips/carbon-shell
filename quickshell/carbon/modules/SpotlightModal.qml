@@ -70,6 +70,7 @@ Item {
 
     function reloadBlankTileConfig() {
         try {
+            blankTileConfigWatcher.reload()
             const raw = blankTileConfigWatcher.text().trim()
             if (raw) root.blankTileConfig = JSON.parse(raw)
         } catch (e) {}

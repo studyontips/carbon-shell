@@ -424,6 +424,17 @@ class ImageCropDialog(Gtk.Window):
             if self.on_apply:
                 self.on_apply(cfg)
 
+            try:
+                import socket
+                sock_path = "/tmp/carbon-shell.sock"
+                if os.path.exists(sock_path):
+                    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+                        s.settimeout(0.5)
+                        s.connect(sock_path)
+                        s.sendall(b"reload-blank-tile\n")
+            except Exception:
+                pass
+
             self.close()
 
         except Exception as e:
