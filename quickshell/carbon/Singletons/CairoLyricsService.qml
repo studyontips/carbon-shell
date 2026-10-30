@@ -23,7 +23,15 @@ Singleton {
     readonly property string trackTitle: activePlayer ? (activePlayer.trackTitle || "") : ""
     readonly property string trackArtist: activePlayer ? (activePlayer.trackArtist || "") : ""
     readonly property string trackAlbum: activePlayer && activePlayer.metadata ? (activePlayer.metadata["xesam:album"] || "") : ""
-    readonly property string trackId: activePlayer && activePlayer.metadata && activePlayer.metadata["mpris:trackid"] ? String(activePlayer.metadata["mpris:trackid"]) : ""
+    readonly property string trackId: {
+        if (!activePlayer || !activePlayer.metadata || !activePlayer.metadata["mpris:trackid"]) return ""
+        var raw = String(activePlayer.metadata["mpris:trackid"])
+        var match = raw.match(/\/track\/([a-zA-Z0-9_-]+)/)
+        if (match && match[1]) return match[1]
+        var matchClean = raw.replace(/QDBusObjectPath|QVariant/g, "").match(/([a-zA-Z0-9_-]{11})/)
+        if (matchClean && matchClean[1]) return matchClean[1]
+        return raw.replace(/QDBusObjectPath|QVariant|\(|\)|"/g, "").trim()
+    }
     readonly property string artUrl: activePlayer ? (activePlayer.trackArtUrl || "") : ""
     readonly property bool isPlaying: activePlayer && activePlayer.playbackState === MprisPlaybackState.Playing
     readonly property bool hasTrack: trackTitle.trim().length > 0

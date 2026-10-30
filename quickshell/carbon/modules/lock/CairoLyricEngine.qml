@@ -27,17 +27,15 @@ Item {
     property double songEpochMs: 0
     property real livePositionMs: 0
     property real lastRawMprisPosMs: -1
-    property int syncOffsetMs: 0 // Neutral 0ms sync so lyrics land precisely on the beat without rushing ahead
-    readonly property int visualLeadMs: CairoLyricsService.hasRichWords ? 210 : 50
+    property int syncOffsetMs: 0 // Neutral 0ms sync so lyrics land precisely on the beat
+    readonly property int visualLeadMs: 0 // Exactly on the beat: zero artificial rush
 
     readonly property real effectivePositionMs: Math.max(0, root.livePositionMs + root.visualLeadMs - root.syncOffsetMs)
     readonly property real effectivePositionSec: root.effectivePositionMs / 1000.0
 
     function syncBaseTimeFromMpris() {
-        var activePlayer = LyricsService.activePlayer
-        var rawPos = activePlayer ? activePlayer.position : 0
-        var posMs = (rawPos > 1000000) ? (rawPos / 1000) : (rawPos < 36000 ? rawPos * 1000 : rawPos)
-        if (isNaN(posMs) || posMs < 0) posMs = 0
+        var mprisSec = LyricsService.currentPosition
+        var posMs = (mprisSec && !isNaN(mprisSec) && mprisSec >= 0) ? (mprisSec * 1000.0) : 0
         root.songEpochMs = Date.now() - posMs
         root.lastRawMprisPosMs = posMs
         root.livePositionMs = posMs
@@ -48,8 +46,21 @@ Item {
         root.syncBaseTimeFromMpris()
     }
 
-    onIsPlayingChanged: {
-        if (root.isPlaying) {
+    Connections {
+        target: LyricsService
+        function onCurrentPositionChanged() {
+            var mprisMs = LyricsService.currentPosition * 1000.0
+            if (mprisMs >= 0) {
+                var diff = Math.abs(root.livePositionMs - mprisMs)
+                // If clock drifts more than 160ms or epoch not set, smoothly snap to media player
+                if (diff > 160 || root.songEpochMs <= 0) {
+                    root.songEpochMs = Date.now() - mprisMs
+                    root.livePositionMs = mprisMs
+                    root.updateSync()
+                }
+            }
+        }
+        function onIsPlayingChanged() {
             root.syncBaseTimeFromMpris()
         }
     }

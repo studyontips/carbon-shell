@@ -153,8 +153,8 @@ Item {
             return
         }
 
-        // Add 0.12s visual lookahead for responsive lead
-        var p = pos + 0.12
+        // Calibrated 0.02s lookahead for exact on-beat timing
+        var p = pos + 0.02
 
         if (p < toks[0].start) {
             root.currentTokenIndex = -1

@@ -172,13 +172,23 @@ def extract_video_id(track_id):
     if not track_id:
         return None
     s = str(track_id).strip()
-    m = re.search(r"([a-zA-Z0-9_-]{11})", s)
-    if m:
-        cand = m.group(1)
+    # 1. Match /track/<id> from MPRIS DBus path (e.g. /com/pocoguy/Muse/track/MX7FSAnRPug)
+    m_track = re.search(r"/track/([a-zA-Z0-9_-]+)", s)
+    if m_track:
+        cand = m_track.group(1).strip()
         p = os.path.expanduser(f"~/.cache/muse/lyrics/{cand}.json")
         if os.path.isfile(p):
             return cand
-    cand = s.split("/")[-1].strip()
+    # 2. Match standard 11-char video ID, ignoring Qt DBus wrapper words
+    s_clean = re.sub(r"(?i)QVariant|QDBusObjectPath|com|pocoguy|Muse", "", s)
+    m = re.search(r"([a-zA-Z0-9_-]{11})", s_clean)
+    if m:
+        cand = m.group(1).strip()
+        p = os.path.expanduser(f"~/.cache/muse/lyrics/{cand}.json")
+        if os.path.isfile(p):
+            return cand
+    # 3. Direct basename check
+    cand = s.split("/")[-1].strip().strip("'\"")
     p = os.path.expanduser(f"~/.cache/muse/lyrics/{cand}.json")
     if os.path.isfile(p):
         return cand
@@ -188,39 +198,10 @@ def find_muse_file_candidates(track_id, title=None, artist=None):
     candidates = []
     vid = extract_video_id(track_id)
     if vid:
-        candidates.append(os.path.expanduser(f"~/.cache/muse/lyrics/{vid}.json"))
-
-    # Check recent streams in ~/.cache/muse/streams/*.json (up to 15)
-    streams_dir = os.path.expanduser("~/.cache/muse/streams")
-    if os.path.isdir(streams_dir):
-        try:
-            recent_streams = sorted(
-                glob.glob(os.path.join(streams_dir, "*.json")),
-                key=os.path.getmtime,
-                reverse=True
-            )[:15]
-            for sf in recent_streams:
-                svid = os.path.splitext(os.path.basename(sf))[0]
-                lf = os.path.expanduser(f"~/.cache/muse/lyrics/{svid}.json")
-                if os.path.isfile(lf) and lf not in candidates:
-                    candidates.append(lf)
-        except Exception:
-            pass
-
-    # Check recent files in ~/.cache/muse/lyrics/*.json (up to 30)
-    lyrics_dir = os.path.expanduser("~/.cache/muse/lyrics")
-    if os.path.isdir(lyrics_dir):
-        try:
-            recent_lyrics = sorted(
-                glob.glob(os.path.join(lyrics_dir, "*.json")),
-                key=os.path.getmtime,
-                reverse=True
-            )[:30]
-            for lf in recent_lyrics:
-                if lf not in candidates:
-                    candidates.append(lf)
-        except Exception:
-            pass
+        p = os.path.expanduser(f"~/.cache/muse/lyrics/{vid}.json")
+        if os.path.isfile(p):
+            candidates.append(p)
+            return candidates # Exact match! Don't search other unrelated files!
     return candidates
 
 def parse_muse_json_results(data, mode="shell"):
@@ -228,16 +209,16 @@ def parse_muse_json_results(data, mode="shell"):
     if not results or not isinstance(results, dict):
         return None
 
-    if mode == "cairo":
-        provider_order = ["BetterLyrics", "BiniLyrics", "Apple Music", "Spotify", "Musixmatch", "NetEase", "LRCLIB", "YouTube Music"]
-    else:
-        pref = data.get("preferred_source")
-        provider_order = []
-        if pref and pref in results:
-            provider_order.append(pref)
-        for p in ["BetterLyrics", "BiniLyrics", "Apple Music", "Spotify", "Musixmatch", "LRCLIB", "NetEase", "YouTube Music"]:
-            if p not in provider_order:
-                provider_order.append(p)
+    pref = data.get("preferred_source")
+    provider_order = []
+    # Always honor user's chosen preferred_source from Mixtapes (e.g. BetterLyrics, Spotify) if available!
+    if pref and pref in results:
+        provider_order.append(pref)
+
+    # Priority order: BetterLyrics & Spotify first, LRCLIB & NetEase next, Apple Music ALWAYS LAST!
+    for p in ["BetterLyrics", "Spotify", "LRCLIB", "Musixmatch", "NetEase", "BiniLyrics", "YouTube Music", "Apple Music"]:
+        if p not in provider_order:
+            provider_order.append(p)
 
     for k in results.keys():
         if k not in provider_order:
@@ -995,77 +976,61 @@ def main():
 
     lines = []
 
-    # 0. Check local Muse / Mixtape cache
-    muse_lines = load_from_muse_cache(trackid, title, artist, mode=mode)
-    if muse_lines and not is_placeholder_lyrics(muse_lines) and not is_mismatched_lyrics(muse_lines, title, artist):
-        lines = muse_lines
+    # 1. Custom curated lyrics (highest priority if manually provided by user)
+    custom_lines = load_custom_lyrics(title, artist)
+    if custom_lines and not is_placeholder_lyrics(custom_lines) and not is_mismatched_lyrics(custom_lines, title, artist):
+        lines = custom_lines
 
-    if not lines and mode == "shell":
-        # Check shell disk cache
-        if os.path.isfile(cache_file):
-            try:
-                with open(cache_file, "r", encoding="utf-8") as f:
-                    cached_data = json.load(f)
-                    if cached_data.get("found"):
-                        c_lines = cached_data.get("lines", [])
-                        if c_lines and not is_mismatched_lyrics(c_lines, title, artist):
-                            print(json.dumps(cached_data))
-                            return
-            except Exception:
-                pass
-
-        # 1. Primary for Shell: Standard synced lines from LRCLIB (standard album line sync)
-        lines = fetch_from_lrclib(title, artist, duration, allow_plain=False)
-
-        # 2. Fallbacks for Shell if LRCLIB has no lyrics
-        if not lines or is_placeholder_lyrics(lines):
-            custom_lines = load_custom_lyrics(title, artist)
-            if custom_lines and not is_mismatched_lyrics(custom_lines, title, artist):
-                lines = custom_lines
-            else:
-                lines = fetch_from_netease(title, artist, duration)
-                if not lines or is_placeholder_lyrics(lines):
-                    lines = fetch_from_kugou(title, artist, duration)
-    elif not lines:
-        # Cairo mode:
-        # 0. Primary Priority: Local Custom Curated / AI Synced Lyrics
-        custom_lines = load_custom_lyrics(title, artist)
-        if custom_lines and not is_mismatched_lyrics(custom_lines, title, artist):
-            lines = custom_lines
-        else:
-            cached_fallback = None
-            if os.path.isfile(cache_file):
-                try:
-                    with open(cache_file, "r", encoding="utf-8") as f:
-                        cached_data = json.load(f)
-                        if cached_data.get("found"):
-                            cached_lines = cached_data.get("lines", [])
-                            if cached_lines and not is_mismatched_lyrics(cached_lines, title, artist):
-                                has_rich_words = any("words" in l and l["words"] for l in cached_lines)
+    # 2. Check disk cache if valid
+    if not lines and os.path.isfile(cache_file):
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                cached_data = json.load(f)
+                if cached_data.get("found"):
+                    c_lines = cached_data.get("lines", [])
+                    if c_lines and not is_placeholder_lyrics(c_lines) and not is_mismatched_lyrics(c_lines, title, artist):
+                        # Verify cache belongs to this song
+                        c_title = (cached_data.get("title") or "").strip().lower()
+                        if not c_title or c_title == title.strip().lower() or clean_text(c_title) == clean_text(title):
+                            if mode == "cairo":
+                                has_rich_words = any("words" in l and l["words"] for l in c_lines)
                                 if has_rich_words:
                                     print(json.dumps(cached_data))
                                     return
-                                cached_fallback = cached_data
-                except Exception:
-                    pass
+                            else:
+                                print(json.dumps(cached_data))
+                                return
+        except Exception:
+            pass
 
-            # 1. Secondary: Kugou syllable-level Richsync
-            lines = fetch_from_kugou(title, artist, duration)
+    # 3. Primary Online Source: Spotify / LRCLIB (The one Spotify uses via LRCLIB/Musixmatch)
+    if not lines or is_placeholder_lyrics(lines):
+        lrclib_lines = fetch_from_lrclib(title, artist, duration, allow_plain=False)
+        if lrclib_lines and not is_placeholder_lyrics(lrclib_lines) and not is_mismatched_lyrics(lrclib_lines, title, artist):
+            lines = lrclib_lines
 
-            # 2. Tertiary fallback: NetEase YRC word-sync / synced LRC
-            if not lines or is_placeholder_lyrics(lines):
-                lines = fetch_from_netease(title, artist, duration)
+    # 4. Secondary Sources for Cairo (Word-by-word / Syllable richsync):
+    if not lines or is_placeholder_lyrics(lines) or (mode == "cairo" and not any("words" in l and l["words"] for l in lines)):
+        # Try Kugou (syllable-level richsync)
+        kg_lines = fetch_from_kugou(title, artist, duration)
+        if kg_lines and not is_placeholder_lyrics(kg_lines) and not is_mismatched_lyrics(kg_lines, title, artist):
+            lines = kg_lines
 
-            # 3. Quaternary fallback: LRCLIB standard sync
-            if not lines or is_placeholder_lyrics(lines):
-                if cached_fallback:
-                    lines = cached_fallback.get("lines", [])
-                else:
-                    lines = fetch_from_lrclib(title, artist, duration, allow_plain=False)
+    if not lines or is_placeholder_lyrics(lines) or (mode == "cairo" and not any("words" in l and l["words"] for l in lines)):
+        # Try NetEase (YRC word sync / synced LRC)
+        ne_lines = fetch_from_netease(title, artist, duration)
+        if ne_lines and not is_placeholder_lyrics(ne_lines) and not is_mismatched_lyrics(ne_lines, title, artist):
+            lines = ne_lines
 
-            # 4. Quinary fallback for Cairo: Untimed Plain Lyrics evenly spaced across duration
-            if not lines or is_placeholder_lyrics(lines):
-                lines = fetch_from_lrclib(title, artist, duration, allow_plain=True)
+    # 5. Mixtape Plan (Local Muse cache with BetterLyrics / Spotify preference, Apple Music LAST)
+    if not lines or is_placeholder_lyrics(lines):
+        muse_lines = load_from_muse_cache(trackid, title, artist, mode=mode)
+        if muse_lines and not is_placeholder_lyrics(muse_lines) and not is_mismatched_lyrics(muse_lines, title, artist):
+            lines = muse_lines
+
+    # 6. Quinary fallback: Untimed Plain Lyrics evenly spaced across duration
+    if not lines or is_placeholder_lyrics(lines):
+        lines = fetch_from_lrclib(title, artist, duration, allow_plain=True)
 
     # Apply Romanization if enabled (strictly Cairo only when romanize is True)
     if romanize and lines:
