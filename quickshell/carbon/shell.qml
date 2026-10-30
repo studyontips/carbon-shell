@@ -22,6 +22,7 @@ ShellRoot {
     readonly property string carbonConfigDir: Quickshell.env("CARBON_CONFIG_DIR") || (root.home + "/.config/carbon")
     property bool launcherOpen: false
     property bool wallpaperPickerOpen: false
+    property bool settingsHubOpen: false
     property string wallpaperSource: "local"
     property var wallpaperModItem: null
     property var launcherItem: null
@@ -717,6 +718,19 @@ ShellRoot {
         if (now - root.lastWpToggleTime < 280) return
         root.lastWpToggleTime = now
         if (root.wallpaperPickerOpen) closeWallpaperPicker(); else openWallpaperPicker()
+    }
+
+    property real lastSettingsToggleTime: 0
+    function openSettingsHub() {
+        root.closeLauncher()
+        root.settingsHubOpen = true
+    }
+    function closeSettingsHub() { root.settingsHubOpen = false }
+    function toggleSettingsHub() {
+        var now = Date.now()
+        if (now - root.lastSettingsToggleTime < 280) return
+        root.lastSettingsToggleTime = now
+        if (root.settingsHubOpen) closeSettingsHub(); else openSettingsHub()
     }
     onLauncherOpenChanged: {
         if (!root.launcherOpen && root.launcherItem)
@@ -1462,6 +1476,12 @@ ShellRoot {
                     }
                     else if (cmd === "close-wallpaper") {
                         root.closeWallpaperPicker()
+                    }
+                    else if (cmd === "settings" || cmd === "toggle-settings" || cmd === "open-settings") {
+                        root.toggleSettingsHub()
+                    }
+                    else if (cmd === "close-settings") {
+                        root.closeSettingsHub()
                     }
                     else if (cmd.startsWith("freeze-start ")) {
                         var fpath = cmd.replace(/^freeze-start\s+/, "").trim()
@@ -3873,6 +3893,33 @@ ShellRoot {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /* Carbon Settings Hub Overlay */
+    Variants {
+        model: Quickshell.screens
+
+        PanelWindow {
+            id: settingsHubWindow
+            required property var modelData
+
+            screen: modelData
+            color: "transparent"
+            WlrLayershell.namespace: "carbon-settings-hub"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: root.settingsHubOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+            exclusionMode: ExclusionMode.Ignore
+            anchors { top: true; left: true; right: true; bottom: true }
+
+            aboveWindows: true
+            visible: root.settingsHubOpen
+
+            SettingsHub {
+                anchors.fill: parent
+                open: root.settingsHubOpen
+                onCloseRequested: root.closeSettingsHub()
             }
         }
     }

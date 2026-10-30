@@ -397,6 +397,9 @@ Singleton {
     /* ── Caelestia Material 3 Palette Tokens ─────────────────────────── */
     readonly property color surface:         root.m3surface
     readonly property color primary:         root.m3primary
+    readonly property color secondary:       root.m3secondary
+    readonly property color tertiary:        root.m3tertiary
+    readonly property color error:           root.m3error
     property color m3background:             "#0E0E12"
     property color m3onBackground:           "#E6E4F0"
     property color m3surface:                "#0E0E12"

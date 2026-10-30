@@ -731,7 +731,7 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Quickshell.execDetached(["sh", "-c", "command -v carbon-config-editor >/dev/null && carbon-config-editor || systemsettings || true"])
+                            Quickshell.execDetached(["sh", root.home + "/.config/carbon/scripts/carbon-ipc.sh", "settings"])
                         }
                     }
                 }
