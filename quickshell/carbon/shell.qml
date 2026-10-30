@@ -4943,38 +4943,6 @@ ShellRoot {
         }
     }
 
-    /* Notch OSD */
-    Variants {
-        model: Quickshell.screens
-
-        PanelWindow {
-            id: osdWindow
-            required property var modelData
-
-            screen: modelData
-            color: "transparent"
-            WlrLayershell.namespace: "carbon-osd"
-            WlrLayershell.layer: WlrLayer.Overlay
-            exclusionMode: ExclusionMode.Ignore
-
-            anchors {
-                top: true
-                left: true
-                right: true
-            }
-            margins {
-                top: root.mainBarEdge === "bottom" ? 16 : 42
-            }
-
-            implicitHeight: osdItem.implicitHeight
-            visible: (root.barMode !== "minimal" && root.barMode !== "minimal_notch") && (osdItem.active || osdItem.opacity > 0.001)
-
-            NotchOsd {
-                id: osdItem
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
-        }
-    }
 
     /* Vanish Workspace OSD */
     Variants {

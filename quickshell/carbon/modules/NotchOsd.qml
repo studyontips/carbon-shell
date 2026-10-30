@@ -69,7 +69,7 @@ Item {
     Process {
         id: brightPoller
         command: ["sh", "-c", "brightnessctl -m 2>/dev/null | head -n1 | cut -d, -f4 | tr -d '%'; exec udevadm monitor --subsystem-match=backlight --udev | while read -r line; do case \"$line\" in *change*) brightnessctl -m 2>/dev/null | head -n1 | cut -d, -f4 | tr -d '%';; esac; done"]
-        running: true
+        running: false
         stdout: SplitParser {
             onRead: line => {
                 const pct = parseInt(line.trim(), 10)
