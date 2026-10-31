@@ -10,6 +10,7 @@ async fn main() {
             "message": "Usage: carbon-drop-engine <host> <file_path>"
         });
         println!("{}", msg);
+        let _ = std::io::stdout().flush();
         std::process::exit(1);
     }
 
@@ -24,6 +25,7 @@ async fn main() {
             "message": format!("File not found: {}", file_path)
         });
         println!("{}", msg);
+        let _ = std::io::stdout().flush();
         std::process::exit(1);
     }
 
@@ -35,6 +37,7 @@ async fn main() {
                 "message": format!("Cannot read file metadata: {}", e)
             });
             println!("{}", msg);
+            let _ = std::io::stdout().flush();
             std::process::exit(1);
         }
     };
@@ -56,10 +59,11 @@ async fn main() {
         "status": initial_status
     });
     println!("{}", init_progress);
-    std::io::stdout().flush().ok();
+    let _ = std::io::stdout().flush();
 
     let mut cmd = tokio::process::Command::new("curl");
-    cmd.arg("--no-buffer")
+    cmd.arg("-g")
+        .arg("--no-buffer")
         .arg("--connect-timeout")
         .arg("15")
         .arg("--max-time")
@@ -70,18 +74,20 @@ async fn main() {
 
     let mut filebin_target_url: Option<String> = None;
 
-    if host.contains("buzz") {
+    if host.starts_with("buzz") || host.contains("buzz") {
         let url = format!("https://w.buzzheavier.com/{}", safe_file_name);
-        cmd.arg("--retry").arg("3")
+        cmd.arg("--retry")
+            .arg("3")
             .arg("--retry-all-errors")
-            .arg("--retry-delay").arg("1")
+            .arg("--retry-delay")
+            .arg("1")
             .arg("-L")
             .arg("-A")
             .arg("Mozilla/5.0")
             .arg("-T")
             .arg(&file_path)
             .arg(&url);
-    } else if host.contains("filebin") {
+    } else if host.starts_with("filebin") || host.contains("filebin") {
         let bin_id = format!(
             "cb{}",
             std::time::SystemTime::now()
@@ -98,17 +104,17 @@ async fn main() {
             .arg("--data-binary")
             .arg(format!("@{}", file_path))
             .arg(&url);
-    } else if host.contains("x0") {
+    } else if host.starts_with("x0") || host.contains("x0") {
         cmd.arg("-A")
             .arg("CarbonDrop/1.0 (ArchLinux; Hyprland)")
             .arg("-F")
             .arg(format!("file=@{}", file_path))
             .arg("https://x0.at");
-    } else if host.contains("uguu") {
+    } else if host.starts_with("uguu") || host.contains("uguu") {
         cmd.arg("-F")
             .arg(format!("files[]=@{}", file_path))
             .arg("https://uguu.se/upload");
-    } else if host.contains("kappa") {
+    } else if host.starts_with("kappa") || host.contains("kappa") {
         cmd.arg("-F")
             .arg(format!("file=@{}", file_path))
             .arg("https://kappa.lol/api/upload");
@@ -128,6 +134,7 @@ async fn main() {
                 "message": format!("Failed to start curl: {}", e)
             });
             println!("{}", msg);
+            let _ = std::io::stdout().flush();
             std::process::exit(1);
         }
     };
@@ -140,11 +147,12 @@ async fn main() {
         "child_pid": child_pid
     });
     println!("{}", init_info);
-    std::io::stdout().flush().ok();
+    let _ = std::io::stdout().flush();
 
     let mut stderr = child.stderr.take().expect("Failed to open child stderr");
     let mut stdout = child.stdout.take().expect("Failed to open child stdout");
 
+    // Concurrently read stderr stream
     let stderr_task = tokio::spawn(async move {
         let mut buf = [0u8; 1024];
         let mut line_buf = Vec::new();
@@ -190,21 +198,22 @@ async fn main() {
         }
     });
 
-    let mut stdout_buf = Vec::new();
+    // Concurrently read stdout stream
     let stdout_task = tokio::spawn(async move {
+        let mut stdout_buf = Vec::new();
         let _ = stdout.read_to_end(&mut stdout_buf).await;
         stdout_buf
     });
 
-    let wait_res = child.wait().await;
-    let _ = stderr_task.await;
-    let stdout_bytes = stdout_task.await.unwrap_or_default();
+    // Join concurrently to prevent pipe buffer deadlock
+    let (wait_res, _, stdout_res) = tokio::join!(child.wait(), stderr_task, stdout_task);
+    let stdout_bytes = stdout_res.unwrap_or_default();
     let stdout_str = String::from_utf8_lossy(&stdout_bytes).to_string();
 
     let exit_success = wait_res.as_ref().map(|s| s.success()).unwrap_or(false);
 
     let final_url: Option<String> = if exit_success {
-        if host.contains("buzz") {
+        if host.starts_with("buzz") || host.contains("buzz") {
             serde_json::from_str::<serde_json::Value>(&stdout_str)
                 .ok()
                 .and_then(|v| {
@@ -212,20 +221,20 @@ async fn main() {
                         .and_then(|x| x.as_str())
                         .map(|id| format!("https://buzzheavier.com/{}", id))
                 })
-        } else if host.contains("filebin") {
+        } else if host.starts_with("filebin") || host.contains("filebin") {
             if stdout_str.contains("filename") || stdout_str.contains("bin") {
                 filebin_target_url
             } else {
                 None
             }
-        } else if host.contains("x0") {
+        } else if host.starts_with("x0") || host.contains("x0") {
             let trimmed = stdout_str.trim().to_string();
             if trimmed.starts_with("http") {
                 Some(trimmed)
             } else {
                 None
             }
-        } else if host.contains("uguu") {
+        } else if host.starts_with("uguu") || host.contains("uguu") {
             serde_json::from_str::<serde_json::Value>(&stdout_str)
                 .ok()
                 .and_then(|v| {
@@ -233,7 +242,7 @@ async fn main() {
                         .and_then(|x| x.as_str())
                         .map(|u| u.to_string())
                 })
-        } else if host.contains("kappa") {
+        } else if host.starts_with("kappa") || host.contains("kappa") {
             serde_json::from_str::<serde_json::Value>(&stdout_str)
                 .ok()
                 .and_then(|v| {
@@ -260,7 +269,7 @@ async fn main() {
             "url": url
         });
         println!("{}", msg);
-        std::io::stdout().flush().ok();
+        let _ = std::io::stdout().flush();
     } else {
         let err_text = format!("Upload failed (exit: {:?}): {}", wait_res, stdout_str.trim());
         let msg = serde_json::json!({
@@ -268,7 +277,7 @@ async fn main() {
             "message": err_text
         });
         println!("{}", msg);
-        std::io::stdout().flush().ok();
+        let _ = std::io::stdout().flush();
         std::process::exit(1);
     }
 }

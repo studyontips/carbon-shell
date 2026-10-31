@@ -3,17 +3,16 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 
-PanelWindow {
+FloatingWindow {
     id: rootWindow
 
-    screen: Quickshell.screens[0]
+    title: "Carbon Drop"
+    implicitWidth: 640
+    implicitHeight: 520
+    minimumSize: Qt.size(640, 520)
+    maximumSize: Qt.size(640, 520)
     color: "transparent"
-    WlrLayershell.namespace: "carbon-drop"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-    anchors { top: true; bottom: true; left: true; right: true }
 
     // Visual states: "Idle" | "Uploading" | "Success" | "Error"
     property string appState: "Idle"
@@ -28,6 +27,8 @@ PanelWindow {
     property int childPid: 0
     property bool dropdownOpen: false
     property bool isCopied: false
+
+    readonly property string enginePath: "/home/shogun/carbon-shell/apps/carbon-drop/target/release/carbon-drop-engine"
 
     readonly property var hosts: [
         { id: "Buzzheavier", label: "Buzzheavier (10GB+)", desc: "10GB+ heavy transfers • Direct streaming" },
@@ -80,7 +81,12 @@ PanelWindow {
         rootWindow.isPaused = false;
         rootWindow.appState = "Uploading";
 
-        uploadProcess.command = ["carbon-drop-engine", currentHost.id, clean];
+        uploadProcess.running = false;
+        uploadProcess.command = [
+            rootWindow.enginePath,
+            rootWindow.currentHost.id,
+            clean
+        ];
         uploadProcess.running = true;
     }
 
@@ -108,6 +114,7 @@ PanelWindow {
     }
 
     function openFilePicker() {
+        zenityProcess.running = false;
         zenityProcess.running = true;
     }
 
@@ -136,34 +143,40 @@ PanelWindow {
 
     Process {
         id: uploadProcess
-        command: ["carbon-drop-engine", rootWindow.currentHost.id, rootWindow.currentFilePath]
-        running: false
         stdout: SplitParser {
             splitMarker: "\n"
-            onRead: line => {
-                let trimmed = line.trim();
-                if (!trimmed) return;
+            onRead: data => {
+                let line = data.trim();
+                if (!line) return;
                 try {
-                    let data = JSON.parse(trimmed);
-                    if (data.type === "init") {
-                        rootWindow.enginePid = data.pid;
-                        rootWindow.childPid = data.child_pid;
-                    } else if (data.type === "progress") {
-                        rootWindow.uploadProgress = data.percent;
-                        rootWindow.uploadStatusText = data.status;
-                    } else if (data.type === "complete") {
-                        rootWindow.finalUrl = data.url;
+                    let msg = JSON.parse(line);
+                    if (msg.type === "init") {
+                        rootWindow.enginePid = msg.pid;
+                        rootWindow.childPid = msg.child_pid;
+                    } else if (msg.type === "progress") {
+                        rootWindow.uploadProgress = msg.percent;
+                        rootWindow.uploadStatusText = msg.status;
+                    } else if (msg.type === "complete") {
                         rootWindow.uploadProgress = 100.0;
+                        rootWindow.finalUrl = msg.url;
                         rootWindow.appState = "Success";
-                        Quickshell.execDetached(["wl-copy", data.url]);
+                        Quickshell.execDetached(["wl-copy", msg.url]);
                         rootWindow.isCopied = true;
                         copyTimer.restart();
-                    } else if (data.type === "error") {
-                        rootWindow.errorMessage = data.message;
+                    } else if (msg.type === "error") {
+                        rootWindow.errorMessage = msg.message;
                         rootWindow.appState = "Error";
                     }
                 } catch (e) {
-                    console.log("Error parsing JSON:", e, trimmed);
+                    console.log("Raw output parsing error:", e, line);
+                }
+            }
+        }
+        stderr: SplitParser {
+            splitMarker: "\n"
+            onRead: data => {
+                if (data.trim().length > 0) {
+                    console.log("Engine stderr:", data.trim());
                 }
             }
         }
@@ -184,36 +197,17 @@ PanelWindow {
         }
     }
 
-    // Dismiss backdrop scrim
-    Rectangle {
-        anchors.fill: parent
-        color: "#99040508"
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: {
-                if (rootWindow.dropdownOpen) {
-                    rootWindow.dropdownOpen = false;
-                } else {
-                    rootWindow.closeApp();
-                }
-            }
-        }
-    }
-
-    // Main Card (640 x 520)
+    // Main Card (640 x 520) - Direct content of FloatingWindow
     Rectangle {
         id: mainCard
-        anchors.centerIn: parent
-        width: 640
-        height: 520
+        anchors.fill: parent
         radius: 16
         color: "#0a0b0e"
         border.color: Qt.rgba(1, 1, 1, 0.08)
         border.width: 1
         clip: false
 
-        // Prevent clicking inside card from closing
+        // Close dropdown when clicking on card background
         MouseArea {
             anchors.fill: parent
             onClicked: {
@@ -286,7 +280,6 @@ PanelWindow {
             width: 592
             height: 300
 
-            // Canvas drawing blueprint matrix + dashed border
             Canvas {
                 id: dropZoneCanvas
                 anchors.fill: parent
