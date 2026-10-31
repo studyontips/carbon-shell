@@ -40,6 +40,7 @@ pub mod slint_compat {
 
 pub trait SlintWindowDropExt {
     fn on_window_event(&self, f: impl FnMut(slint_compat::WindowEvent) + 'static);
+    fn set_clipboard_text(&self, text: &str);
 }
 
 impl SlintWindowDropExt for ::slint::Window {
@@ -53,6 +54,10 @@ impl SlintWindowDropExt for ::slint::Window {
             }
             EventResult::Propagate
         });
+    }
+
+    fn set_clipboard_text(&self, text: &str) {
+        copy_to_clipboard(text);
     }
 }
 
@@ -345,9 +350,9 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
 
     let task = tokio::spawn(async move {
         let client = reqwest::Client::builder()
-            .user_agent("Mozilla/5.0 (X11; Linux x86_64) CarbonDrop/1.0")
+            .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
             .build()
-            .unwrap_or_default();
+            .unwrap();
 
         let file_bytes = tokio::fs::read(&file_path).await.unwrap();
         let file_name = std::path::Path::new(&file_path).file_name().unwrap().to_string_lossy().into_owned();
@@ -368,13 +373,21 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
         let response = client.post(url).multipart(form).send().await.unwrap();
         let response_text = response.text().await.unwrap();
 
-        // Extract URL (file.io requires JSON parsing, others are plain text)
-        let final_url = if active_api_string == "file.io" {
-            let json: serde_json::Value = serde_json::from_str(&response_text).unwrap();
-            json["link"].as_str().unwrap_or("").to_string()
+        // HTML Error Guard:
+        // Before updating the UI with the final_url, check if it's an HTML error page:
+        let parsed_url = if response_text.trim().starts_with("<!") || response_text.trim().starts_with("<html") {
+            "Error: API rejected upload (Size Limit or Format)".to_string()
         } else {
-            response_text.trim().to_string()
+            // (Your existing file.io JSON parsing or raw text logic here)
+            if active_api_string == "file.io" {
+                let json: serde_json::Value = serde_json::from_str(&response_text).unwrap();
+                json["link"].as_str().unwrap_or("").to_string()
+            } else {
+                response_text.trim().to_string()
+            }
         };
+
+        let final_url = parsed_url;
 
         // Send final_url back to Slint and set state to Success
         let _ = slint::invoke_from_event_loop(move || {
@@ -383,6 +396,7 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
                 ui.set_state(AppState::Success);
                 ui.set_upload_progress(1.0);
                 ui.set_arc_path(calculate_arc_path(1.0).into());
+                ui.set_final_url(final_url.clone().into());
                 ui.set_result_url(final_url.into());
             }
         });
@@ -434,12 +448,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // 2. Browse Button Callback
+    // 2. Browse / Open File Dialog Callbacks
     let ui_weak = ui.as_weak();
     let controller_browse = controller.clone();
-    ui.on_browse_clicked(move || {
+    ui.on_open_file_dialog({
         let ui_weak = ui_weak.clone();
         let controller = controller_browse.clone();
+        move || {
+            let ui_weak = ui_weak.clone();
+            let controller = controller.clone();
+            tokio::spawn(async move {
+                let file = rfd::AsyncFileDialog::new()
+                    .set_title("Select File to Upload")
+                    .pick_file()
+                    .await;
+
+                if let Some(handle) = file {
+                    let path = handle.path().to_path_buf();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(ui) = ui_weak.upgrade() {
+                            start_upload(&ui, path, &controller);
+                        }
+                    });
+                }
+            });
+        }
+    });
+
+    let ui_weak_browse = ui.as_weak();
+    let controller_browse2 = controller.clone();
+    ui.on_browse_clicked(move || {
+        let ui_weak = ui_weak_browse.clone();
+        let controller = controller_browse2.clone();
         tokio::spawn(async move {
             let file = rfd::AsyncFileDialog::new()
                 .set_title("Select File to Upload")
@@ -482,11 +522,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // 5. Copy Link Callback
+    // 5. Copy Clipboard Callbacks
+    let ui_weak = ui.as_weak();
+    ui.on_copy_to_clipboard({
+        let ui_weak = ui_weak.clone();
+        move |text| {
+            if let Some(ui) = ui_weak.upgrade() {
+                ui.window().set_clipboard_text(&text.to_string());
+            }
+        }
+    });
+
     let ui_weak = ui.as_weak();
     ui.on_copy_link(move || {
         if let Some(ui) = ui_weak.upgrade() {
-            let url = ui.get_result_url().to_string();
+            let url = ui.get_final_url().to_string();
+            let url = if url.is_empty() { ui.get_result_url().to_string() } else { url };
             if !url.is_empty() {
                 copy_to_clipboard(&url);
                 ui.set_link_copied(true);
@@ -506,9 +557,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ui.on_reset_state(move || {
         if let Some(ui) = ui_weak.upgrade() {
             ui.set_state(AppState::Idle);
+            ui.set_app_state(0);
             ui.set_upload_progress(0.0);
             ui.set_arc_path(calculate_arc_path(0.0).into());
             ui.set_file_name("".into());
+            ui.set_final_url("".into());
             ui.set_result_url("".into());
             ui.set_status_message("".into());
             ui.set_is_paused(false);

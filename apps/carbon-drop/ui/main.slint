@@ -1,3 +1,5 @@
+import { HorizontalBox } from "std-widgets.slint";
+
 export enum AppState {
     Idle,
     Uploading,
@@ -16,6 +18,7 @@ export component MainWindow inherits Window {
     in-out property <float> upload_progress: 0.0;
     in-out property <string> file_name: "";
     in-out property <string> result_url: "";
+    in-out property <string> final_url: "";
     in-out property <string> status_message: "";
     in-out property <string> arc_path: "M 40 8 A 32 32 0 0 1 72 40";
     in-out property <bool> is_drag_over: false;
@@ -24,7 +27,9 @@ export component MainWindow inherits Window {
 
     callback select_api(string);
     callback browse_clicked();
+    callback open_file_dialog();
     callback start_upload(string);
+    callback copy_to_clipboard(string);
     callback cancel_upload();
     callback pause_toggle();
     callback copy_link();
@@ -424,35 +429,19 @@ export component MainWindow inherits Window {
                         vertical-alignment: center;
                     }
 
-                    Rectangle {
-                        width: 130px;
-                        height: 36px;
-                        border-radius: 8px;
-                        background: browse_touch.has-hover ? #ffffff1a : #ffffff0d;
-                        border-width: 1px;
-                        border-color: browse_touch.has-hover ? #00f0ff66 : #ffffff18;
-
-                        browse_touch := TouchArea {
-                            clicked => {
-                                root.browse_clicked();
-                            }
+                    // Flush manual browse button
+                    TouchArea {
+                        width: 120px;
+                        clicked => {
+                            root.open_file_dialog();
                         }
-
-                        HorizontalLayout {
-                            alignment: center;
-                            spacing: 6px;
-                            Text {
-                                text: "📁";
-                                font-size: 13px;
-                                vertical-alignment: center;
-                            }
-                            Text {
-                                text: "Browse Files";
-                                color: #ffffffdd;
-                                font-size: 12px;
-                                font-weight: 600;
-                                vertical-alignment: center;
-                            }
+                        Text {
+                            text: "[ ⇪ BROWSE ]";
+                            color: parent.pressed ? #ffffff : #8ee8a8;
+                            font-size: 13px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
                         }
                     }
                 }
@@ -530,80 +519,39 @@ export component MainWindow inherits Window {
                 }
 
                 // === STATE: SUCCESS ===
-                if root.state == AppState.Success : HorizontalLayout {
-                    width: 100%;
+                if root.state == AppState.Success : HorizontalBox {
                     alignment: space-between;
-                    spacing: 10px;
-
-                    // URL TextInput / Selectable box
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        height: 38px;
-                        border-radius: 8px;
-                        background: #00000088;
-                        border-width: 1px;
-                        border-color: #ffffff22;
-                        HorizontalLayout {
-                            padding-left: 12px;
-                            padding-right: 12px;
-                            TextInput {
-                                text: root.result_url;
-                                color: #56d4ff;
-                                font-size: 13px;
-                                vertical-alignment: center;
-                                read-only: true;
-                            }
-                        }
+                    width: 100%;
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    
+                    // The scrollable, selectable (but read-only) URL box
+                    TextInput {
+                        text: root.final_url;
+                        read-only: true;
+                        color: #8ee8a8; // Theme.primary
+                        font-size: 13px;
+                        width: 320px;
+                        single-line: true;
                     }
-
-                    // [ ⧉ COPY LINK ] Button
-                    copy_btn := Rectangle {
-                        width: 124px;
-                        height: 38px;
-                        border-radius: 8px;
-                        background: root.link_copied ? #22c55e : (copy_touch.has-hover ? #00f0ff : #00f0ffcc);
-                        border-width: 1px;
-                        border-color: root.link_copied ? #22c55e : #00f0ff;
-                        animate background { duration: 120ms; }
-
-                        copy_touch := TouchArea {
-                            clicked => {
-                                root.copy_link();
-                            }
-                        }
-
-                        Text {
-                            text: root.link_copied ? "✓ COPIED" : "⧉ COPY LINK";
-                            color: #0a0b0e;
-                            font-size: 12px;
-                            font-weight: 700;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                    
+                    // The Copy Button
+                    TouchArea {
+                        width: 100px;
+                        clicked => { root.copy_to_clipboard(root.final_url); }
+                        Text { 
+                            text: "[ ⧉ COPY ]"; 
+                            color: parent.pressed ? #ffffff : #8ee8a8;
                         }
                     }
 
                     // Reset / New Upload Button
-                    new_btn := Rectangle {
+                    TouchArea {
                         width: 80px;
-                        height: 38px;
-                        border-radius: 8px;
-                        background: new_touch.has-hover ? #ffffff1a : #ffffff0a;
-                        border-width: 1px;
-                        border-color: #ffffff20;
-
-                        new_touch := TouchArea {
-                            clicked => {
-                                root.reset_state();
-                            }
-                        }
-
+                        clicked => { root.reset_state(); }
                         Text {
-                            text: "+ NEW";
-                            color: #ffffffcc;
-                            font-size: 12px;
-                            font-weight: 600;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                            text: "[ + NEW ]";
+                            color: parent.pressed ? #ffffff : #ffffff88;
                         }
                     }
                 }
