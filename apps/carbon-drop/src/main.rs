@@ -349,52 +349,57 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
     let active_api_string = api_name;
 
     let task = tokio::spawn(async move {
-        let mut cmd = tokio::process::Command::new("curl");
-        cmd.arg("-sS"); // Do NOT use -L on POST requests as it converts POST to GET on 301/302!
-
-        match active_api_string.as_str() {
+        let (mut cmd, is_uguu) = match active_api_string.as_str() {
             "0x0.st" => {
-                cmd.arg("-A").arg("CarbonDrop/1.0")
-                   .arg("-F").arg(format!("file=@\"{}\"", file_path))
-                   .arg("https://0x0.st");
+                let mut c = tokio::process::Command::new("curl");
+                c.arg("-sS")
+                 .arg("-m").arg("10")
+                 .arg("-A").arg("CarbonDrop/1.0")
+                 .arg("-F").arg(format!("file=@{}", file_path))
+                 .arg("https://0x0.st");
+                (c, false)
             }
             "Litterbox" => {
-                cmd.arg("-L")
-                   .arg("-H").arg("User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0")
-                   .arg("-H").arg("Origin: https://litterbox.catbox.moe")
-                   .arg("-H").arg("Referer: https://litterbox.catbox.moe/")
-                   .arg("-F").arg("reqtype=fileupload")
-                   .arg("-F").arg("time=1h")
-                   .arg("-F").arg(format!("fileToUpload=@\"{}\"", file_path))
-                   .arg("https://litterbox.catbox.moe/resources/internals/api.php");
+                let mut c = tokio::process::Command::new("curl");
+                c.arg("-sS")
+                 .arg("-m").arg("10")
+                 .arg("-L")
+                 .arg("-H").arg("User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0")
+                 .arg("-H").arg("Origin: https://litterbox.catbox.moe")
+                 .arg("-H").arg("Referer: https://litterbox.catbox.moe/")
+                 .arg("-F").arg("reqtype=fileupload")
+                 .arg("-F").arg("time=1h")
+                 .arg("-F").arg(format!("fileToUpload=@{}", file_path))
+                 .arg("https://litterbox.catbox.moe/resources/internals/api.php");
+                (c, false)
             }
-            "file.io" => {
-                cmd.arg("-L")
-                   .arg("--post301").arg("--post302").arg("--post303") // Keep POST method across redirects!
-                   .arg("-H").arg("Accept: application/json")
-                   .arg("-H").arg("User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0")
-                   .arg("-F").arg(format!("file=@\"{}\"", file_path))
-                   .arg("https://file.io/");
+            "uguu.se" | "file.io" | _ => {
+                let mut c = tokio::process::Command::new("curl");
+                c.arg("-sS")
+                 .arg("-m").arg("15")
+                 .arg("-F").arg(format!("files[]=@{}", file_path))
+                 .arg("https://uguu.se/upload");
+                (c, true)
             }
-            _ => return,
-        }
+        };
 
         let output = cmd.output().await;
 
-        let final_url = match output {
+        let mut final_url = match output {
             Ok(out) => {
                 let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
                 let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
-                
+
                 if !out.status.success() || stdout.is_empty() {
                     format!("Error: {}", if stderr.is_empty() { "Upload failed" } else { &stderr })
-                } else if stdout.starts_with("<!") || stdout.starts_with("<html") {
-                    // Print the first 300 characters of stdout to terminal so we can debug if blocked
-                    eprintln!("API returned HTML:\n{}", &stdout[..stdout.len().min(300)]);
-                    "Error: Cloudflare challenge on host (Try 0x0.st)".to_string()
-                } else if active_api_string == "file.io" {
+                } else if stdout.starts_with("<!") || stdout.contains("<html") {
+                    eprintln!("API returned HTML challenge:\n{}", &stdout[..stdout.len().min(300)]);
+                    "Error: WAF/Cloudflare challenge on host".to_string()
+                } else if is_uguu || active_api_string == "file.io" || active_api_string == "uguu.se" {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
-                        json["link"].as_str().unwrap_or("Error: No link in JSON").to_string()
+                        json["files"][0]["url"].as_str().map(|u| u.to_string()).unwrap_or_else(|| {
+                            format!("Error: {}", stdout)
+                        })
                     } else {
                         stdout
                     }
@@ -404,6 +409,30 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
             }
             Err(e) => format!("Error executing curl: {}", e),
         };
+
+        // Automatic fallback: If 0x0.st or Litterbox timed out or failed with WAF/error, upload to uguu.se
+        if (final_url.starts_with("Error:") || final_url.is_empty())
+            && active_api_string != "uguu.se"
+            && active_api_string != "file.io"
+        {
+            eprintln!("Upload to {} failed ({}). Attempting fallback to uguu.se...", active_api_string, final_url);
+            let mut fb_cmd = tokio::process::Command::new("curl");
+            fb_cmd.arg("-sS")
+                  .arg("-m").arg("15")
+                  .arg("-F").arg(format!("files[]=@{}", file_path))
+                  .arg("https://uguu.se/upload");
+
+            if let Ok(fb_out) = fb_cmd.output().await {
+                let fb_stdout = String::from_utf8_lossy(&fb_out.stdout).trim().to_string();
+                if fb_out.status.success() {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&fb_stdout) {
+                        if let Some(url) = json["files"][0]["url"].as_str() {
+                            final_url = url.to_string();
+                        }
+                    }
+                }
+            }
+        }
 
         // Send final_url back to Slint and set state to Success
         let _ = slint::invoke_from_event_loop(move || {

@@ -14,7 +14,7 @@ export component MainWindow inherits Window {
 
     in-out property <AppState> state: AppState.Idle;
     in-out property <int> app_state: 0;
-    in-out property <string> active_api: "0x0.st";
+    in-out property <string> active_api: "uguu.se";
     in-out property <float> upload_progress: 0.0;
     in-out property <string> file_name: "";
     in-out property <string> result_url: "";
@@ -133,9 +133,12 @@ export component MainWindow inherits Window {
                     : @image-url("assets/dashed_border.svg");
             }
 
-            // Purely decorative touch area disabled so it does not intercept pointer drop events
+            // Clickable drop zone triggers file dialog when clicked in Idle state
             drop_touch := TouchArea {
-                enabled: false;
+                enabled: root.state == AppState.Idle;
+                clicked => {
+                    root.open_file_dialog();
+                }
             }
 
             // STATE OVERLAYS
@@ -390,17 +393,17 @@ export component MainWindow inherits Window {
                             vertical-alignment: center;
                         }
 
-                        // API 3: file.io
-                        api_fileio := Rectangle {
+                        // API 3: uguu.se
+                        api_uguu := Rectangle {
                             height: 30px;
                             border-radius: 15px;
-                            background: root.active_api == "file.io" ? #00f0ff22 : (api_fileio_touch.has-hover ? #ffffff0d : transparent);
-                            border-width: root.active_api == "file.io" ? 1px : 0px;
+                            background: (root.active_api == "uguu.se" || root.active_api == "file.io") ? #00f0ff22 : (api_uguu_touch.has-hover ? #ffffff0d : transparent);
+                            border-width: (root.active_api == "uguu.se" || root.active_api == "file.io") ? 1px : 0px;
                             border-color: #00f0ff55;
 
-                            api_fileio_touch := TouchArea {
+                            api_uguu_touch := TouchArea {
                                 clicked => {
-                                    root.select_api("file.io");
+                                    root.select_api("uguu.se");
                                 }
                             }
 
@@ -409,15 +412,15 @@ export component MainWindow inherits Window {
                                 padding-right: 12px;
                                 alignment: center;
                                 Text {
-                                    text: (root.active_api == "file.io" ? "◆" : "◇") + " file.io";
-                                    color: root.active_api == "file.io" ? #00f0ff : #ffffff88;
+                                    text: ((root.active_api == "uguu.se" || root.active_api == "file.io") ? "◆" : "◇") + " uguu.se";
+                                    color: (root.active_api == "uguu.se" || root.active_api == "file.io") ? #00f0ff : #ffffff88;
                                     font-size: 12px;
                                     font-weight: 600;
                                     vertical-alignment: center;
                                     horizontal-alignment: center;
+                                }
                             }
                         }
-                    }
                 }
             }
         }
