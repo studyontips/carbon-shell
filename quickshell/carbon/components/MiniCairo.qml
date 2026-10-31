@@ -153,8 +153,8 @@ Item {
             return
         }
 
-        // Calibrated 0.02s lookahead for exact on-beat timing
-        var p = pos + 0.02
+        // Calibrated 0.12s visual lookahead for responsive lead
+        var p = pos + 0.12
 
         if (p < toks[0].start) {
             root.currentTokenIndex = -1
@@ -253,8 +253,8 @@ Item {
             opacity: kineticBarrel.prevText.length > 0 ? 0.35 : 0.0
             scale: 0.88
 
-            Behavior on y { NumberAnimation { duration: 220; easing.type: Easing.OutQuint } }
-            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutQuint } }
+            Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutQuad } }
 
             Text {
                 id: prevTxt
@@ -276,8 +276,8 @@ Item {
             height: curTxt.implicitHeight + 10
             opacity: kineticBarrel.curText.length > 0 ? (kineticBarrel.idx === -1 ? 0.45 : 1.0) : 0.0
 
-            Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutQuint } }
-            Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutQuad } }
+            Behavior on width { NumberAnimation { duration: 140; easing.type: Easing.OutQuint } }
+            Behavior on opacity { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
 
             // Cairo Signature Translucent Glass Tape Block
             Rectangle {
@@ -329,8 +329,8 @@ Item {
             opacity: kineticBarrel.nextText.length > 0 ? 0.45 : 0.0
             scale: 0.90
 
-            Behavior on y { NumberAnimation { duration: 220; easing.type: Easing.OutQuint } }
-            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutQuint } }
+            Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutQuad } }
 
             Text {
                 id: nextTxt

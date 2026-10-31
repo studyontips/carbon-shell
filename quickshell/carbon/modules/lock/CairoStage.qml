@@ -350,26 +350,26 @@ Item {
         opacity: stageOpacity
         visible: stageOpacity > 0.005
 
-        // Transitions: 340ms Easing.OutQuint across all barrel coordinates
+        // Transitions: 240ms Easing.OutQuint across all barrel coordinates
         Behavior on stageY {
             enabled: delegateRoot.enableAnim && delegateRoot.stage >= 0
-            NumberAnimation { duration: 340; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: 240; easing.type: Easing.OutQuint }
         }
         Behavior on stageScaleX {
             enabled: delegateRoot.enableAnim && delegateRoot.stage >= 0
-            NumberAnimation { duration: 340; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: 240; easing.type: Easing.OutQuint }
         }
         Behavior on stageScaleY {
             enabled: delegateRoot.enableAnim && delegateRoot.stage >= 0
-            NumberAnimation { duration: 340; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: 240; easing.type: Easing.OutQuint }
         }
         Behavior on stageRotX {
             enabled: delegateRoot.enableAnim && delegateRoot.stage >= 0
-            NumberAnimation { duration: 340; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: 240; easing.type: Easing.OutQuint }
         }
         Behavior on stageOpacity {
             enabled: delegateRoot.enableAnim && delegateRoot.stage >= 0
-            NumberAnimation { duration: 340; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: 240; easing.type: Easing.OutQuint }
         }
 
         transform: [

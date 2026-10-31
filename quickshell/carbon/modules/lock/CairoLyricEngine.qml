@@ -27,8 +27,8 @@ Item {
     property double songEpochMs: 0
     property real livePositionMs: 0
     property real lastRawMprisPosMs: -1
-    property int syncOffsetMs: 0 // Neutral 0ms sync so lyrics land precisely on the beat
-    readonly property int visualLeadMs: 0 // Exactly on the beat: zero artificial rush
+    property int syncOffsetMs: 0 // Neutral 0ms sync
+    readonly property int visualLeadMs: CairoLyricsService.hasRichWords ? 120 : 100 // Calibrated 120ms lead compensation for audio driver latency & snappy on-beat delivery
 
     readonly property real effectivePositionMs: Math.max(0, root.livePositionMs + root.visualLeadMs - root.syncOffsetMs)
     readonly property real effectivePositionSec: root.effectivePositionMs / 1000.0
