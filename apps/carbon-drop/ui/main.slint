@@ -14,7 +14,7 @@ export component MainWindow inherits Window {
 
     in-out property <AppState> state: AppState.Idle;
     in-out property <int> app_state: 0;
-    in-out property <string> active_api: "uguu.se";
+    in-out property <string> active_api: "x0.at";
     in-out property <float> upload_progress: 0.0;
     in-out property <string> file_name: "";
     in-out property <string> result_url: "";
@@ -320,16 +320,16 @@ export component MainWindow inherits Window {
                         padding-left: 8px;
                         padding-right: 8px;
 
-                        // API 1: 0x0.st
+                        // API 1: x0.at
                         api_0x0 := Rectangle {
                             height: 30px;
                             border-radius: 15px;
-                            background: root.active_api == "0x0.st" ? #00f0ff22 : (api_0x0_touch.has-hover ? #ffffff0d : transparent);
-                            border-width: root.active_api == "0x0.st" ? 1px : 0px;
+                            background: (root.active_api == "x0.at" || root.active_api == "0x0.st") ? #00f0ff22 : (api_0x0_touch.has-hover ? #ffffff0d : transparent);
+                            border-width: (root.active_api == "x0.at" || root.active_api == "0x0.st") ? 1px : 0px;
                             border-color: #00f0ff55;
                             api_0x0_touch := TouchArea {
                                 clicked => {
-                                    root.select_api("0x0.st");
+                                    root.select_api("x0.at");
                                 }
                             }
 
@@ -338,8 +338,8 @@ export component MainWindow inherits Window {
                                 padding-right: 12px;
                                 alignment: center;
                                 Text {
-                                    text: (root.active_api == "0x0.st" ? "◆" : "◇") + " 0x0.st";
-                                    color: root.active_api == "0x0.st" ? #00f0ff : #ffffff88;
+                                    text: ((root.active_api == "x0.at" || root.active_api == "0x0.st") ? "◆" : "◇") + " x0.at";
+                                    color: (root.active_api == "x0.at" || root.active_api == "0x0.st") ? #00f0ff : #ffffff88;
                                     font-size: 12px;
                                     font-weight: 600;
                                     vertical-alignment: center;
@@ -356,17 +356,17 @@ export component MainWindow inherits Window {
                             vertical-alignment: center;
                         }
 
-                        // API 2: Litterbox
-                        api_litterbox := Rectangle {
+                        // API 2: kappa.lol
+                        api_kappa := Rectangle {
                             height: 30px;
                             border-radius: 15px;
-                            background: root.active_api == "Litterbox" ? #00f0ff22 : (api_lit_touch.has-hover ? #ffffff0d : transparent);
-                            border-width: root.active_api == "Litterbox" ? 1px : 0px;
+                            background: (root.active_api == "kappa.lol" || root.active_api == "Litterbox") ? #00f0ff22 : (api_kappa_touch.has-hover ? #ffffff0d : transparent);
+                            border-width: (root.active_api == "kappa.lol" || root.active_api == "Litterbox") ? 1px : 0px;
                             border-color: #00f0ff55;
 
-                            api_lit_touch := TouchArea {
+                            api_kappa_touch := TouchArea {
                                 clicked => {
-                                    root.select_api("Litterbox");
+                                    root.select_api("kappa.lol");
                                 }
                             }
 
@@ -375,8 +375,8 @@ export component MainWindow inherits Window {
                                 padding-right: 12px;
                                 alignment: center;
                                 Text {
-                                    text: (root.active_api == "Litterbox" ? "◆" : "◇") + " Litterbox";
-                                    color: root.active_api == "Litterbox" ? #00f0ff : #ffffff88;
+                                    text: ((root.active_api == "kappa.lol" || root.active_api == "Litterbox") ? "◆" : "◇") + " kappa.lol";
+                                    color: (root.active_api == "kappa.lol" || root.active_api == "Litterbox") ? #00f0ff : #ffffff88;
                                     font-size: 12px;
                                     font-weight: 600;
                                     vertical-alignment: center;

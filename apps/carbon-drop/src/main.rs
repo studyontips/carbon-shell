@@ -320,6 +320,59 @@ async fn upload_file(
     Ok(final_url)
 }
 
+async fn upload_to_x0(file_path: &str) -> Result<String, String> {
+    let mut cmd = tokio::process::Command::new("curl");
+    cmd.arg("-sS")
+       .arg("--connect-timeout").arg("10")
+       .arg("--max-time").arg("600")
+       .arg("-A").arg("CarbonDrop/1.0 (Linux)")
+       .arg("-F").arg(format!("file=@{}", file_path))
+       .arg("https://x0.at");
+
+    let output = cmd.output().await.map_err(|e| format!("Error executing curl: {}", e))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if !output.status.success() || stdout.is_empty() {
+        return Err(format!("Error: {}", if stderr.is_empty() { "x0.at upload failed" } else { &stderr }));
+    }
+
+    if stdout.starts_with("http://") || stdout.starts_with("https://") {
+        Ok(stdout)
+    } else {
+        Err(format!("Error from x0.at: {}", stdout))
+    }
+}
+
+async fn upload_to_kappa(file_path: &str) -> Result<String, String> {
+    let mut cmd = tokio::process::Command::new("curl");
+    cmd.arg("-sS")
+       .arg("--connect-timeout").arg("10")
+       .arg("--max-time").arg("600")
+       .arg("-F").arg(format!("file=@{}", file_path))
+       .arg("https://kappa.lol/api/upload");
+
+    let output = cmd.output().await.map_err(|e| format!("Error executing curl: {}", e))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if !output.status.success() || stdout.is_empty() {
+        return Err(format!("Error: {}", if stderr.is_empty() { "kappa.lol upload failed" } else { &stderr }));
+    }
+
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
+        if let Some(link) = json["link"].as_str() {
+            return Ok(link.to_string());
+        }
+    }
+
+    if stdout.starts_with("http://") || stdout.starts_with("https://") {
+        Ok(stdout)
+    } else {
+        Err(format!("Error parsing kappa.lol response: {}", stdout))
+    }
+}
+
 async fn upload_to_uguu(file_path: &str) -> Result<String, String> {
     let mut cmd = tokio::process::Command::new("curl");
     cmd.arg("-sS")
@@ -333,7 +386,7 @@ async fn upload_to_uguu(file_path: &str) -> Result<String, String> {
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
     if !output.status.success() || stdout.is_empty() {
-        return Err(format!("Error: {}", if stderr.is_empty() { "Uguu upload failed" } else { &stderr }));
+        return Err(format!("Error: {}", if stderr.is_empty() { "uguu.se upload failed" } else { &stderr }));
     }
 
     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
@@ -379,89 +432,11 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
 
     let task = tokio::spawn(async move {
         let final_url: String = match active_api_string.as_str() {
-            "0x0.st" => {
-                // 1. Try 0x0.st first
-                let mut cmd = tokio::process::Command::new("curl");
-                cmd.arg("-sS")
-                   .arg("--connect-timeout").arg("10")
-                   .arg("--max-time").arg("600")
-                   .arg("-A").arg("curl/8.7.1")
-                   .arg("-F").arg(format!("file=@{}", file_path))
-                   .arg("https://0x0.st");
-
-                let mut url = match cmd.output().await {
-                    Ok(out) if out.status.success() => {
-                        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                        if s.starts_with("https://0x0.st/") || s.starts_with("http://0x0.st/") {
-                            Some(s)
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
-                };
-
-                // 2. Fall back to temp.sh if 0x0.st fails
-                if url.is_none() {
-                    eprintln!("0x0.st unreachable or returned error. Falling back to temp.sh...");
-                    let mut temp_cmd = tokio::process::Command::new("curl");
-                    temp_cmd.arg("-sS")
-                            .arg("--connect-timeout").arg("10")
-                            .arg("--max-time").arg("600")
-                            .arg("-F").arg(format!("file=@{}", file_path))
-                            .arg("https://temp.sh/upload");
-
-                    if let Ok(temp_out) = temp_cmd.output().await {
-                        if temp_out.status.success() {
-                            let s = String::from_utf8_lossy(&temp_out.stdout).trim().to_string();
-                            if s.starts_with("http://") || s.starts_with("https://") {
-                                url = Some(s);
-                            }
-                        }
-                    }
-                }
-
-                // 3. Fall back to uguu.se if temp.sh is unreachable/500
-                if let Some(u) = url {
-                    u
-                } else {
-                    eprintln!("temp.sh unreachable or returned error. Falling back to uguu.se...");
-                    upload_to_uguu(&file_path).await.unwrap_or_else(|e| e)
-                }
+            "x0.at" | "0x0.st" => {
+                upload_to_x0(&file_path).await.unwrap_or_else(|e| e)
             }
-            "Litterbox" => {
-                let mut cmd = tokio::process::Command::new("curl");
-                cmd.arg("-sS")
-                   .arg("-4")
-                   .arg("--doh-url").arg("https://1.1.1.1/dns-query")
-                   .arg("--connect-timeout").arg("10")
-                   .arg("--max-time").arg("600")
-                   .arg("-A").arg("curl/8.7.1")
-                   .arg("-F").arg("reqtype=fileupload")
-                   .arg("-F").arg("time=24h")
-                   .arg("-F").arg(format!("fileToUpload=@{}", file_path))
-                   .arg("https://litterbox.catbox.moe/resources/internals/api.php");
-
-                let url = match cmd.output().await {
-                    Ok(out) if out.status.success() => {
-                        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                        if s.starts_with("<!") || s.contains("<html") || s.contains("BunkerWeb") || s.contains("Forbidden") || s.is_empty() {
-                            None
-                        } else if s.starts_with("http://") || s.starts_with("https://") {
-                            Some(s)
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
-                };
-
-                if let Some(u) = url {
-                    u
-                } else {
-                    eprintln!("Litterbox returned HTML/WAF challenge or failed. Falling back to uguu.se...");
-                    upload_to_uguu(&file_path).await.unwrap_or_else(|e| e)
-                }
+            "kappa.lol" | "Litterbox" => {
+                upload_to_kappa(&file_path).await.unwrap_or_else(|e| e)
             }
             "uguu.se" | "file.io" | _ => {
                 upload_to_uguu(&file_path).await.unwrap_or_else(|e| e)
