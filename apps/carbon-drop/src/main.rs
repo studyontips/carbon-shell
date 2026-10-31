@@ -359,26 +359,36 @@ async fn upload_to_buzzheavier(file_path: &str) -> Result<String, String> {
     }
 }
 
-async fn upload_to_tempsh(file_path: &str) -> Result<String, String> {
+async fn upload_to_filebin(file_path: &str) -> Result<String, String> {
+    let file_name = std::path::Path::new(file_path)
+        .file_name().unwrap_or_default().to_string_lossy().replace(' ', "_");
+    let bin_id = format!("cb{}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() % 100000000);
+    let target_url = format!("https://filebin.net/{}/{}", bin_id, file_name);
+
     let mut cmd = tokio::process::Command::new("curl");
     cmd.arg("-sS")
        .arg("--connect-timeout").arg("15")
        .arg("--max-time").arg("7200")
-       .arg("-F").arg(format!("file=@{}", file_path))
-       .arg("https://temp.sh/upload");
+       .arg("-X").arg("POST")
+       .arg("-H").arg("Accept: application/json")
+       .arg("--data-binary").arg(format!("@{}", file_path))
+       .arg(&target_url);
 
     let output = cmd.output().await.map_err(|e| format!("Error executing curl: {}", e))?;
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
     if !output.status.success() || stdout.is_empty() {
-        return Err(format!("Error: {}", if stderr.is_empty() { "temp.sh upload failed" } else { &stderr }));
+        return Err(format!("Error: {}", if stderr.is_empty() { "filebin.net upload failed" } else { &stderr }));
     }
 
-    if stdout.starts_with("http://") || stdout.starts_with("https://") {
+    if stdout.contains("\"filename\"") || stdout.contains("\"bin\"") {
+        Ok(target_url)
+    } else if stdout.starts_with("http://") || stdout.starts_with("https://") {
         Ok(stdout)
     } else {
-        Err(format!("Error from temp.sh: {}", stdout))
+        Err(format!("Error from filebin.net: {}", stdout))
     }
 }
 
@@ -503,8 +513,8 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
             "Buzzheavier" => {
                 upload_to_buzzheavier(&file_path).await.unwrap_or_else(|e| e)
             }
-            "temp.sh" => {
-                upload_to_tempsh(&file_path).await.unwrap_or_else(|e| e)
+            "filebin.net" => {
+                upload_to_filebin(&file_path).await.unwrap_or_else(|e| e)
             }
             "x0.at" | "0x0.st" => {
                 upload_to_x0(&file_path).await.unwrap_or_else(|e| e)
@@ -655,7 +665,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ui) = ui_weak.upgrade() {
             let cap = match api_name.as_str() {
                 "Buzzheavier" => "10GB+",
-                "temp.sh" => "4GB Raw",
+                "filebin.net" => "5GB+ Raw",
                 "x0.at" => "1GB Raw",
                 "uguu.se" => "128MB Embed",
                 "kappa.lol" => "100MB Perm",
@@ -831,7 +841,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(api) = api_arg {
         let cap = match api.as_str() {
             "Buzzheavier" => "10GB+",
-            "temp.sh" => "4GB Raw",
+            "filebin.net" => "5GB+ Raw",
             "x0.at" => "1GB Raw",
             "uguu.se" => "128MB Embed",
             "kappa.lol" => "100MB Perm",

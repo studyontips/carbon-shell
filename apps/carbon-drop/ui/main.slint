@@ -576,16 +576,16 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                // Option 2: temp.sh
+                // Option 2: filebin.net
                 Rectangle {
                     height: 32px;
                     border-radius: 6px;
-                    background: opt_temp_touch.has-hover ? #00f0ff1a : (root.active_api == "temp.sh" ? #00f0ff10 : transparent);
-                    opt_temp_touch := TouchArea {
+                    background: opt_filebin_touch.has-hover ? #00f0ff1a : (root.active_api == "filebin.net" ? #00f0ff10 : transparent);
+                    opt_filebin_touch := TouchArea {
                         clicked => {
-                            root.active_api = "temp.sh";
-                            root.active_capacity = "4GB Raw";
-                            root.select_api("temp.sh");
+                            root.active_api = "filebin.net";
+                            root.active_capacity = "5GB+ Raw";
+                            root.select_api("filebin.net");
                             root.dropdown_open = false;
                         }
                     }
@@ -594,15 +594,15 @@ export component MainWindow inherits Window {
                         padding-right: 10px;
                         alignment: space-between;
                         Text {
-                            text: (root.active_api == "temp.sh" ? "◆ " : "  ") + "temp.sh";
-                            color: root.active_api == "temp.sh" ? #00f0ff : (opt_temp_touch.has-hover ? #ffffff : #ffffffcc);
+                            text: (root.active_api == "filebin.net" ? "◆ " : "  ") + "filebin.net";
+                            color: root.active_api == "filebin.net" ? #00f0ff : (opt_filebin_touch.has-hover ? #ffffff : #ffffffcc);
                             font-size: 12px;
-                            font-weight: root.active_api == "temp.sh" ? 600 : 400;
+                            font-weight: root.active_api == "filebin.net" ? 600 : 400;
                             vertical-alignment: center;
                         }
                         Text {
-                            text: "4GB Raw";
-                            color: root.active_api == "temp.sh" ? #00f0ffaa : #ffffff66;
+                            text: "5GB+ Raw";
+                            color: root.active_api == "filebin.net" ? #00f0ffaa : #ffffff66;
                             font-size: 11px;
                             vertical-alignment: center;
                         }
