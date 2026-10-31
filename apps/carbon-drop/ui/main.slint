@@ -122,9 +122,9 @@ export component MainWindow inherits Window {
                     : @image-url("assets/dashed_border.svg");
             }
 
-            // Purely visual touch area for Idle state hover styling
+            // Purely decorative touch area disabled so it does not intercept pointer drop events
             drop_touch := TouchArea {
-                enabled: root.state == AppState.Idle;
+                enabled: false;
             }
 
             // STATE OVERLAYS

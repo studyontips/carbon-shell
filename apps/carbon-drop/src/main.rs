@@ -345,49 +345,60 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
     controller.paused_flag.store(false, Ordering::Relaxed);
 
     let ui_weak = ui.as_weak();
-    let file_path = path;
+    let file_path = path.to_string_lossy().to_string();
     let active_api_string = api_name;
 
     let task = tokio::spawn(async move {
-        let client = reqwest::Client::builder()
-            .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
-            .build()
-            .unwrap();
+        let mut cmd = tokio::process::Command::new("curl");
+        cmd.arg("-sS") // Silent but show errors
+           .arg("-L"); // Follow redirects
 
-        let file_bytes = tokio::fs::read(&file_path).await.unwrap();
-        let file_name = std::path::Path::new(&file_path).file_name().unwrap().to_string_lossy().into_owned();
-        let part = reqwest::multipart::Part::bytes(file_bytes).file_name(file_name);
-        let form = reqwest::multipart::Form::new();
-
-        // Match based on active_api state from the UI
-        let (url, form) = match active_api_string.as_str() {
-            "0x0.st" => ("https://0x0.st", form.part("file", part)),
-            "Litterbox" => (
-                "https://litterbox.catbox.moe/resources/internals/api.php",
-                form.text("reqtype", "fileupload").text("time", "1h").part("fileToUpload", part)
-            ),
-            "file.io" => ("https://file.io/", form.part("file", part)),
-            _ => return,
-        };
-
-        let response = client.post(url).multipart(form).send().await.unwrap();
-        let response_text = response.text().await.unwrap();
-
-        // HTML Error Guard:
-        // Before updating the UI with the final_url, check if it's an HTML error page:
-        let parsed_url = if response_text.trim().starts_with("<!") || response_text.trim().starts_with("<html") {
-            "Error: API rejected upload (Size Limit or Format)".to_string()
-        } else {
-            // (Your existing file.io JSON parsing or raw text logic here)
-            if active_api_string == "file.io" {
-                let json: serde_json::Value = serde_json::from_str(&response_text).unwrap();
-                json["link"].as_str().unwrap_or("").to_string()
-            } else {
-                response_text.trim().to_string()
+        match active_api_string.as_str() {
+            "0x0.st" => {
+                // 0x0.st requires a custom non-browser User-Agent
+                cmd.arg("-A").arg("CarbonDrop/1.0")
+                   .arg("-F").arg(format!("file=@{}", file_path))
+                   .arg("https://0x0.st");
             }
-        };
+            "Litterbox" => {
+                cmd.arg("-A").arg("curl/8.7.1")
+                   .arg("-F").arg("reqtype=fileupload")
+                   .arg("-F").arg("time=1h")
+                   .arg("-F").arg(format!("fileToUpload=@{}", file_path))
+                   .arg("https://litterbox.catbox.moe/resources/internals/api.php");
+            }
+            "file.io" => {
+                cmd.arg("-F").arg(format!("file=@{}", file_path))
+                   .arg("https://file.io/");
+            }
+            _ => return,
+        }
 
-        let final_url = parsed_url;
+        let output = cmd.output().await;
+
+        let final_url = match output {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                
+                if !out.status.success() || stdout.is_empty() {
+                    format!("Error: {}", if stderr.is_empty() { "Upload failed" } else { &stderr })
+                } else if stdout.starts_with("<!") || stdout.starts_with("<html") {
+                    // Print the raw HTML to terminal so we can debug if blocked
+                    eprintln!("API returned HTML:\n{}", stdout);
+                    "Error: Host blocked request or ISP restriction".to_string()
+                } else if active_api_string == "file.io" {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
+                        json["link"].as_str().unwrap_or("Error: No link in JSON").to_string()
+                    } else {
+                        stdout
+                    }
+                } else {
+                    stdout
+                }
+            }
+            Err(e) => format!("Error executing curl: {}", e),
+        };
 
         // Send final_url back to Slint and set state to Success
         let _ = slint::invoke_from_event_loop(move || {
@@ -421,6 +432,8 @@ fn copy_to_clipboard(text: &str) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+
     // Initialize Tokio multithreaded runtime
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -527,8 +540,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ui.on_copy_to_clipboard({
         let ui_weak = ui_weak.clone();
         move |text| {
+            let text_str = text.to_string();
             if let Some(ui) = ui_weak.upgrade() {
-                ui.window().set_clipboard_text(&text.to_string());
+                ui.window().set_clipboard_text(&text_str);
+            }
+            // Native Wayland clipboard fallback
+            if let Ok(mut child) = std::process::Command::new("wl-copy")
+                .stdin(std::process::Stdio::piped())
+                .spawn()
+            {
+                if let Some(mut stdin) = child.stdin.take() {
+                    use std::io::Write;
+                    let _ = stdin.write_all(text_str.as_bytes());
+                }
             }
         }
     });
