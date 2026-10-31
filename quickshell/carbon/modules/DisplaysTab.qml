@@ -217,7 +217,28 @@ Item {
         tempDebounce.restart()
     }
 
+    function initScreensFallback() {
+        if ((!root.monitorsList || root.monitorsList.length === 0) && Quickshell.screens && Quickshell.screens.length > 0) {
+            var fallback = []
+            for (var s = 0; s < Quickshell.screens.length; s++) {
+                var scr = Quickshell.screens[s]
+                fallback.push({
+                    name: scr.name || "eDP-1",
+                    width: scr.width || 1366,
+                    height: scr.height || 768,
+                    refreshRate: 60.0,
+                    transform: 0,
+                    scale: 1.0,
+                    focused: (s === 0)
+                })
+            }
+            root.monitorsList = fallback
+            root.syncActiveMonitor()
+        }
+    }
+
     Component.onCompleted: {
+        root.initScreensFallback()
         root.sendHub({ "module": "display", "action": "get_monitors" })
         root.sendHub({ "module": "display", "action": "get_shell_scale" })
     }
@@ -231,8 +252,8 @@ Item {
         // ===================================================================
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 280
-            Layout.minimumHeight: 260
+            Layout.preferredHeight: 300
+            Layout.minimumHeight: 280
             clip: true
 
             // Inset Card Container with Rounded Corners & Clip to prevent bleeding
@@ -240,35 +261,43 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 14
                 radius: 14
-                color: Qt.rgba(0, 0, 0, 0.25)
-                border.color: Qt.rgba(1, 1, 1, 0.08)
+                color: Qt.rgba(0, 0, 0, 0.35)
+                border.color: Qt.rgba(1, 1, 1, 0.12)
                 border.width: 1
                 clip: true
 
-                // Dotted Matrix Grid (2px dots, 16px spacing, opacity 0.08)
+                // Dotted Matrix Grid (Crisp 1.2px dots, 18px spacing, opacity 0.22)
                 Canvas {
                     id: blueprintCanvas
                     anchors.fill: parent
-                    opacity: 0.08
+                    opacity: 0.22
                     onPaint: {
                         var ctx = getContext("2d")
                         ctx.clearRect(0, 0, width, height)
                         ctx.fillStyle = "#FFFFFF"
-                        var spacing = 16
+                        var spacing = 18
                         for (var x = spacing / 2; x < width; x += spacing) {
                             for (var y = spacing / 2; y < height; y += spacing) {
                                 ctx.beginPath()
-                                ctx.arc(x, y, 1, 0, Math.PI * 2)
+                                ctx.arc(x, y, 1.2, 0, Math.PI * 2)
                                 ctx.fill()
                             }
                         }
                     }
                 }
 
-                // Interactive Monitor Nodes in Blueprint
-                RowLayout {
-                    anchors.centerIn: parent
-                    spacing: 28
+                // Interactive Monitor Nodes in Blueprint (Horizontally scrollable if multi-monitor)
+                Flickable {
+                    anchors.fill: parent
+                    contentWidth: Math.max(width, monitorRow.implicitWidth + 56)
+                    contentHeight: height
+                    boundsBehavior: Flickable.StopAtBounds
+                    clip: true
+
+                    RowLayout {
+                        id: monitorRow
+                        anchors.centerIn: parent
+                        spacing: 28
 
                     Repeater {
                         model: root.monitorsList
@@ -383,6 +412,7 @@ Item {
                 }
             }
         }
+    }
 
         // 1px Top Border Separating Blueprint From Controls
         Rectangle {

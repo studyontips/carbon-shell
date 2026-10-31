@@ -72,7 +72,6 @@ fn config_dir() -> PathBuf {
 // HYPRLAND HANDLER (< 1ms IPC over raw unix socket)
 // ---------------------------------------------------------------------------
 async fn get_hypr_socket_path() -> Option<PathBuf> {
-    let sig = env::var("HYPRLAND_INSTANCE_SIGNATURE").ok()?;
     let xdg = env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| {
         if let Ok(out) = std::process::Command::new("id").arg("-u").output() {
             if let Ok(uid_str) = String::from_utf8(out.stdout) {
@@ -84,12 +83,26 @@ async fn get_hypr_socket_path() -> Option<PathBuf> {
         }
         "/tmp".to_string()
     });
-    let p = PathBuf::from(xdg).join("hypr").join(sig).join(".socket.sock");
-    if p.exists() {
-        Some(p)
-    } else {
-        None
+
+    if let Ok(sig) = env::var("HYPRLAND_INSTANCE_SIGNATURE") {
+        let p = PathBuf::from(&xdg).join("hypr").join(&sig).join(".socket.sock");
+        if p.exists() {
+            return Some(p);
+        }
     }
+
+    // Auto-discover if HYPRLAND_INSTANCE_SIGNATURE is not set in environment
+    let hypr_dir = PathBuf::from(&xdg).join("hypr");
+    if let Ok(entries) = std::fs::read_dir(&hypr_dir) {
+        for entry in entries.flatten() {
+            let sock = entry.path().join(".socket.sock");
+            if sock.exists() {
+                return Some(sock);
+            }
+        }
+    }
+
+    None
 }
 
 async fn send_raw_hypr_cmd(cmd: &str) -> Result<String, String> {

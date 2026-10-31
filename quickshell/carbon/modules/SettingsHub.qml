@@ -12,7 +12,7 @@ Item {
     property bool open: false
     signal closeRequested()
 
-    property string currentSection: "Display"
+    property string currentSection: "Modes"
 
     // Backdrop dismissal
     MouseArea {
@@ -137,6 +137,7 @@ Item {
                         Repeater {
                             model: [
                                 { name: "Appearance", glyph: "󰏘", badge: "M3" },
+                                { name: "Modes", glyph: "󱐋", badge: "STUDIO" },
                                 { name: "Display", glyph: "󰍹", badge: "" },
                                 { name: "Audio", glyph: "󰓃", badge: "" },
                                 { name: "Network", glyph: "󰤨", badge: "" },
@@ -222,6 +223,11 @@ Item {
                     AppearanceTab {
                         anchors.fill: parent
                         visible: root.currentSection === "Appearance"
+                    }
+
+                    ModesTab {
+                        anchors.fill: parent
+                        visible: root.currentSection === "Modes"
                     }
 
                     DisplaysTab {

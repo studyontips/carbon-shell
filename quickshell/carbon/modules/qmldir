@@ -59,3 +59,4 @@ SettingsHub SettingsHub.qml
 DisplaysTab DisplaysTab.qml
 AudioTab AudioTab.qml
 NetworkTab NetworkTab.qml
+ModesTab ModesTab.qml
