@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import QtQuick.Effects
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import "../Singletons"
@@ -43,10 +44,8 @@ Item {
     property int activePreviewWorkspace: 1
     property bool centerExpanded: false
 
-    // Draggable Y Positions (Strictly Y-Axis Only)
-    property real leftBarY: 0
-    property real centerBarY: 0
-    property real rightBarY: 0
+    // Draggable Y Position (Unified: All 3 notch bars move together down/up)
+    property real notchBarsY: 0
 
     // Geometry & Atmosphere Preview Settings
     property int previewNotchHeight: 34
@@ -57,9 +56,69 @@ Item {
     property int previewAppGap: 6
 
     function resetBarPositions() {
-        leftBarY = 0
-        centerBarY = 0
-        rightBarY = 0
+        notchBarsY = 0
+    }
+
+    // ── Vanish Mode State & Configuration ────────────────────────────────────
+    property bool vanishMediaPlaying: true
+    property string vanishSubSection: "Designs" // "Designs" | "Settings"
+    property bool vanishTransitionEnabled: false
+    property string vanishTransitionWord: "Wooshh!!"
+    property int vanishWallpaperDuration: 800
+    property string vanishWallpaperAnimation: "cinematic"
+    property bool vanishShowRestingAtom: false
+    property string vanishRestingSpin: "hover"
+    property string vanishMusicVisualizer: "liquidHalo"
+
+    FileView {
+        id: vanishConfigView
+        path: (Quickshell.env("CARBON_CONFIG_DIR") || ((Quickshell.env("HOME") || "") + "/.config/carbon")) + "/carbon-bar-mode.json"
+        watchChanges: true
+        printErrors: false
+        onLoaded: root.loadVanishConfig()
+        onFileChanged: vanishConfigView.reload()
+    }
+
+    function loadVanishConfig() {
+        try {
+            const raw = vanishConfigView.text().trim()
+            if (!raw) return
+            const d = JSON.parse(raw)
+            if (d.mode) {
+                var m = String(d.mode).toLowerCase()
+                if (m === "notch" || m === "pill") root.currentMode = 0
+                else if (m === "minimal" || m === "minimal_notch") root.currentMode = 1
+                else if (m === "nucleus" || m === "vanish") root.currentMode = 2
+            }
+            if (d.wallpaperAnimation) root.vanishWallpaperAnimation = String(d.wallpaperAnimation)
+            if (d.wallpaperDuration) root.vanishWallpaperDuration = Number(d.wallpaperDuration)
+            if (d.musicVisualizer) root.vanishMusicVisualizer = String(d.musicVisualizer)
+            if (d.nucleus) {
+                if (d.nucleus.transition !== undefined) root.vanishTransitionEnabled = Boolean(d.nucleus.transition)
+                if (d.nucleus.transitionWord) root.vanishTransitionWord = String(d.nucleus.transitionWord)
+                if (d.nucleus.showRestingAtom !== undefined) root.vanishShowRestingAtom = Boolean(d.nucleus.showRestingAtom)
+                if (d.nucleus.restingSpin) root.vanishRestingSpin = String(d.nucleus.restingSpin)
+            }
+        } catch (e) {
+            console.warn("[ModesTab] Error loading carbon-bar-mode.json:", e)
+        }
+    }
+
+    function saveVanishConfig(key, val) {
+        var script = "import json, os\n" +
+            "dir = os.environ.get('CARBON_CONFIG_DIR', os.path.expanduser('~/.config/carbon'))\n" +
+            "os.makedirs(dir, exist_ok=True)\n" +
+            "p = os.path.join(dir, 'carbon-bar-mode.json')\n" +
+            "d = json.load(open(p)) if os.path.exists(p) else {}\n"
+        if (key.indexOf("nucleus.") === 0) {
+            var subKey = key.substring(8)
+            script += "if 'nucleus' not in d: d['nucleus'] = {}\n"
+            script += "d['nucleus']['" + subKey + "'] = " + JSON.stringify(val) + "\n"
+        } else {
+            script += "d['" + key + "'] = " + JSON.stringify(val) + "\n"
+        }
+        script += "json.dump(d, open(p, 'w'), indent=2)\n"
+        Quickshell.execDetached(["python3", "-c", script])
     }
 
     ColumnLayout {
@@ -259,7 +318,7 @@ Item {
                                 anchors.rightMargin: 12
 
                                 Text {
-                                    text: "BLUEPRINT // NOTCH SYSTEM (HOLD & DRAG BARS VERTICALLY)"
+                                    text: "BLUEPRINT // NOTCH SYSTEM (HOLD ANY BAR TO DRAG DOWN • UNIFIED Y-AXIS)"
                                     font.family: Theme.fontMono
                                     font.pixelSize: Theme.fontPx(8.5)
                                     font.weight: Font.Bold
@@ -268,11 +327,38 @@ Item {
 
                                 Item { Layout.fillWidth: true }
 
-                                Text {
-                                    text: "Y-AXIS LOCKED  •  CLICK NOTCH TO EXPAND"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontPx(8)
-                                    color: Qt.rgba(1, 1, 1, 0.40)
+                                Rectangle {
+                                    Layout.preferredHeight: 18
+                                    Layout.preferredWidth: 60
+                                    radius: 4
+                                    color: resetNotchMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.15) : Qt.rgba(1, 1, 1, 0.06)
+                                    border.color: Qt.rgba(1, 1, 1, 0.15)
+                                    border.width: 1
+
+                                    RowLayout {
+                                        anchors.centerIn: parent
+                                        spacing: 3
+                                        Text {
+                                            text: "↺"
+                                            font.pixelSize: 10
+                                            color: Theme.primary
+                                        }
+                                        Text {
+                                            text: "RESET"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontPx(8)
+                                            font.weight: Font.Bold
+                                            color: Qt.rgba(1, 1, 1, 0.85)
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: resetNotchMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.resetBarPositions()
+                                    }
                                 }
                             }
                         }
@@ -283,75 +369,196 @@ Item {
                             anchors.fill: parent
                             anchors.topMargin: 24
 
-                            // ── 1. LEFT NOTCH BAR (Draggable Y-Only) ────────
+                            // Screen Top Bezel Edge (Baseline)
+                            Rectangle {
+                                id: screenBezelBaseline
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 1.5
+                                color: Qt.rgba(1, 1, 1, 0.35)
+                                z: 25
+                            }
+
+                            // Drop Connection Traces Canvas (Vertical Guide Lines from Bezel to Notch)
+                            Canvas {
+                                id: notchTraceCanvas
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: Math.max(1, root.notchBarsY + 40)
+                                visible: root.notchBarsY > 2
+                                z: 1
+
+                                Connections {
+                                    target: root
+                                    function onNotchBarsYChanged() {
+                                        notchTraceCanvas.requestPaint()
+                                    }
+                                }
+
+                                onPaint: {
+                                    var ctx = getContext("2d")
+                                    ctx.clearRect(0, 0, width, height)
+                                    var y1 = 0
+                                    var y2 = root.notchBarsY
+
+                                    ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.55)
+                                    ctx.lineWidth = 1.0
+                                    ctx.setLineDash([3, 3])
+
+                                    // 1. Left bar connection traces:
+                                    // Left screen edge (x = 0)
+                                    ctx.beginPath()
+                                    ctx.moveTo(1, y1)
+                                    ctx.lineTo(1, y2)
+                                    ctx.stroke()
+
+                                    // Right ear tip: at leftBarWrapper.x + leftBarWrapper.width
+                                    var leftEarX = Math.round(leftBarWrapper.x + leftBarWrapper.width)
+                                    ctx.beginPath()
+                                    ctx.moveTo(leftEarX, y1)
+                                    ctx.lineTo(leftEarX, y2)
+                                    ctx.stroke()
+
+                                    // 2. Center bar connection traces:
+                                    // Left ear tip and Right ear tip
+                                    var centerLeftX = Math.round(centerBarWrapper.x)
+                                    var centerRightX = Math.round(centerBarWrapper.x + centerBarWrapper.width)
+                                    ctx.beginPath()
+                                    ctx.moveTo(centerLeftX, y1)
+                                    ctx.lineTo(centerLeftX, y2)
+                                    ctx.moveTo(centerRightX, y1)
+                                    ctx.lineTo(centerRightX, y2)
+                                    ctx.stroke()
+
+                                    // 3. Right bar connection traces:
+                                    // Left ear tip and Right screen edge
+                                    var rightEarX = Math.round(rightBarWrapper.x)
+                                    var rightEdgeX = Math.round(width - 1)
+                                    ctx.beginPath()
+                                    ctx.moveTo(rightEarX, y1)
+                                    ctx.lineTo(rightEarX, y2)
+                                    ctx.moveTo(rightEdgeX, y1)
+                                    ctx.lineTo(rightEdgeX, y2)
+                                    ctx.stroke()
+
+                                    // Top bezel ticks at each ear
+                                    ctx.setLineDash([])
+                                    ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
+                                    var tickLen = 4
+                                    ctx.beginPath()
+                                    ctx.moveTo(leftEarX - tickLen, y1)
+                                    ctx.lineTo(leftEarX + tickLen, y1)
+                                    ctx.moveTo(centerLeftX - tickLen, y1)
+                                    ctx.lineTo(centerLeftX + tickLen, y1)
+                                    ctx.moveTo(centerRightX - tickLen, y1)
+                                    ctx.lineTo(centerRightX + tickLen, y1)
+                                    ctx.moveTo(rightEarX - tickLen, y1)
+                                    ctx.lineTo(rightEarX + tickLen, y1)
+                                    ctx.stroke()
+                                }
+                            }
+
+                            // Offset Indicator Badge
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                y: Math.max(2, (root.notchBarsY - 18) / 2)
+                                height: 16
+                                width: dropDistText.implicitWidth + 14
+                                radius: 4
+                                color: Qt.rgba(0, 0, 0, 0.85)
+                                border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.50)
+                                border.width: 1
+                                visible: root.notchBarsY > 12
+                                z: 22
+
+                                Text {
+                                    id: dropDistText
+                                    anchors.centerIn: parent
+                                    text: "↕ OFFSET: +" + Math.round(root.notchBarsY) + "px"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontPx(8)
+                                    font.weight: Font.Bold
+                                    color: Theme.primary
+                                }
+                            }
+
+                            // ── UNIFIED DRAGGABLE NOTCH CONTAINER (All bars move in unison) ──
                             Item {
-                                id: leftBarWrapper
-                                x: 20
-                                y: root.leftBarY
-                                width: leftBarCard.width
-                                height: leftBarCard.height
-                                z: leftDragArea.pressed ? 10 : 2
+                                id: notchBarsContainer
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                y: root.notchBarsY
+                                height: Math.max(root.centerExpanded ? 240 : root.previewNotchHeight, root.previewNotchHeight)
 
                                 DragHandler {
-                                    id: leftDragHandler
-                                    target: leftBarWrapper
+                                    id: notchUnifiedDragHandler
+                                    target: notchBarsContainer
                                     xAxis.enabled: false
                                     yAxis.enabled: true
                                     yAxis.minimum: 0
-                                    yAxis.maximum: Math.max(0, blueprintWorkspace.height - leftBarWrapper.height - 10)
+                                    yAxis.maximum: Math.max(0, blueprintWorkspace.height - (root.centerExpanded ? 240 : root.previewNotchHeight) - 10)
+                                    onActiveChanged: {
+                                        if (!active) root.notchBarsY = notchBarsContainer.y
+                                    }
                                 }
 
                                 MouseArea {
-                                    id: leftDragArea
+                                    id: notchUnifiedDragArea
                                     anchors.fill: parent
                                     cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-                                    drag.target: leftBarWrapper
+                                    drag.target: notchBarsContainer
                                     drag.axis: Drag.YAxis
                                     drag.minimumY: 0
-                                    drag.maximumY: Math.max(0, blueprintWorkspace.height - leftBarWrapper.height - 10)
-                                    onReleased: root.leftBarY = leftBarWrapper.y
+                                    drag.maximumY: Math.max(0, blueprintWorkspace.height - (root.centerExpanded ? 240 : root.previewNotchHeight) - 10)
+                                    onPositionChanged: {
+                                        if (pressed) root.notchBarsY = notchBarsContainer.y
+                                    }
+                                    onReleased: root.notchBarsY = notchBarsContainer.y
                                 }
 
-                                Rectangle {
-                                    id: leftBarCard
-                                    width: leftBarContent.implicitWidth + 24
-                                    height: root.previewNotchHeight
-                                    radius: root.previewBottomRadius
-                                    color: Qt.rgba(0.04, 0.04, 0.06, root.previewNotchOpacity)
-                                    border.color: leftDragArea.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.50) : Qt.rgba(1, 1, 1, 0.14)
-                                    border.width: 1
+                                // ── 1. LEFT NOTCH BAR (Flush Left Edge, Fillet on Right) ──
+                                Item {
+                                    id: leftBarWrapper
+                                    anchors.left: parent.left
+                                    y: 0
+                                    width: leftNotchBar.width
+                                    height: leftNotchBar.height
+                                    z: leftDragArea.pressed ? 10 : 2
 
-                                    // Ear Fillets (visual notch integration)
-                                    Rectangle {
-                                        width: 10
-                                        height: 10
-                                        anchors.left: parent.left
-                                        anchors.top: parent.top
-                                        color: "transparent"
-                                        border.color: Qt.rgba(1, 1, 1, 0.10)
-                                        border.width: 1
-                                        visible: root.leftBarY <= 1
-                                    }
-                                    Rectangle {
-                                        width: 10
-                                        height: 10
-                                        anchors.right: parent.right
-                                        anchors.top: parent.top
-                                        color: "transparent"
-                                        border.color: Qt.rgba(1, 1, 1, 0.10)
-                                        border.width: 1
-                                        visible: root.leftBarY <= 1
+                                    MouseArea {
+                                        id: leftDragArea
+                                        anchors.fill: parent
+                                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                                        drag.target: notchBarsContainer
+                                        drag.axis: Drag.YAxis
+                                        drag.minimumY: 0
+                                        drag.maximumY: Math.max(0, blueprintWorkspace.height - (root.centerExpanded ? 240 : root.previewNotchHeight) - 10)
+                                        onPositionChanged: {
+                                            if (pressed) root.notchBarsY = notchBarsContainer.y
+                                        }
+                                        onReleased: root.notchBarsY = notchBarsContainer.y
                                     }
 
-                                    RowLayout {
-                                        id: leftBarContent
-                                        anchors.centerIn: parent
-                                        spacing: 8
+                                    NotchContainer {
+                                        id: leftNotchBar
+                                        leftFillet: false
+                                        rightFillet: true
+                                        filletRadius: root.previewEarRadius
+                                        bottomRadius: root.previewBottomRadius
+                                        notchOpacity: root.previewNotchOpacity
+                                        implicitHeight: root.previewNotchHeight
+                                        height: root.previewNotchHeight
+                                        horizontalPadding: 10
+                                        contentSpacing: 8
+                                        mouseArea.enabled: false
 
                                         // Brand Logo Button
                                         Rectangle {
-                                            Layout.preferredWidth: 22
-                                            Layout.preferredHeight: 22
+                                            z: 2
+                                            width: 22
+                                            height: 22
                                             radius: 6
                                             color: logoBtnMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20) : "transparent"
                                             border.color: logoBtnMouse.containsMouse ? Theme.primary : "transparent"
@@ -374,8 +581,9 @@ Item {
                                             }
                                         }
 
-                                        // Workspace Switcher Pills (Interactive!)
-                                        RowLayout {
+                                        // Workspace Switcher Pills (Interactive)
+                                        Row {
+                                            z: 2
                                             spacing: 4
 
                                             Repeater {
@@ -384,8 +592,8 @@ Item {
                                                     required property int modelData
                                                     readonly property bool isSelected: root.activePreviewWorkspace === modelData
 
-                                                    Layout.preferredWidth: isSelected ? 22 : 16
-                                                    Layout.preferredHeight: 18
+                                                    width: isSelected ? 22 : 16
+                                                    height: 18
                                                     radius: 5
                                                     color: isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22) : (wsMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent")
                                                     border.color: isSelected ? Theme.primary : "transparent"
@@ -411,312 +619,312 @@ Item {
                                         }
                                     }
                                 }
-                            }
 
-                            // ── 2. CENTER NOTCH BAR (Draggable Y-Only & Expandable) ─
-                            Item {
-                                id: centerBarWrapper
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                y: root.centerBarY
-                                width: root.centerExpanded ? Math.min(parent.width - 40, 560) : centerBarContent.implicitWidth + 28
-                                height: root.centerExpanded ? 240 : root.previewNotchHeight
-                                z: root.centerExpanded ? 20 : (centerDragArea.pressed ? 10 : 3)
+                                // ── 2. CENTER NOTCH BAR (Fillets on Both Sides, Expandable) ──
+                                Item {
+                                    id: centerBarWrapper
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    y: 0
+                                    width: centerNotchBar.width
+                                    height: centerNotchBar.height
+                                    z: root.centerExpanded ? 20 : (centerDragArea.pressed ? 10 : 3)
 
-                                Behavior on width {
-                                    NumberAnimation { duration: 320; easing.type: Easing.OutBack; easing.overshoot: 1.08 }
-                                }
-                                Behavior on height {
-                                    NumberAnimation { duration: 320; easing.type: Easing.OutBack; easing.overshoot: 1.08 }
-                                }
-
-                                DragHandler {
-                                    id: centerDragHandler
-                                    target: centerBarWrapper
-                                    xAxis.enabled: false
-                                    yAxis.enabled: true
-                                    yAxis.minimum: 0
-                                    yAxis.maximum: Math.max(0, blueprintWorkspace.height - centerBarWrapper.height - 10)
-                                }
-
-                                MouseArea {
-                                    id: centerDragArea
-                                    anchors.fill: parent
-                                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-                                    drag.target: centerBarWrapper
-                                    drag.axis: Drag.YAxis
-                                    drag.minimumY: 0
-                                    drag.maximumY: Math.max(0, blueprintWorkspace.height - centerBarWrapper.height - 10)
-                                    onReleased: root.centerBarY = centerBarWrapper.y
-                                    onClicked: {
-                                        // Toggle center pavilion expansion preview
-                                        root.centerExpanded = !root.centerExpanded
-                                    }
-                                }
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: root.centerExpanded ? 18 : root.previewBottomRadius
-                                    color: Qt.rgba(0.04, 0.04, 0.06, root.previewNotchOpacity)
-                                    border.color: root.centerExpanded ? Theme.primary : (centerDragArea.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.50) : Qt.rgba(1, 1, 1, 0.14))
-                                    border.width: root.centerExpanded ? 1.5 : 1
-                                    clip: true
-
-                                    // Compact State (Unexpanded)
-                                    RowLayout {
-                                        id: centerBarContent
-                                        anchors.centerIn: parent
-                                        visible: !root.centerExpanded
-                                        spacing: 8
-
-                                        // Titan Clock
-                                        Text {
-                                            text: "10:19"
-                                            font.family: Theme.font
-                                            font.pixelSize: Theme.fontPx(12.5)
-                                            font.weight: Font.Bold
-                                            color: Theme.primary
-                                        }
-
-                                        // Separator
-                                        Text {
-                                            text: "|"
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: Theme.fontPx(11)
-                                            color: Qt.rgba(1, 1, 1, 0.25)
-                                        }
-
-                                        // Spinning Disc Glyph
-                                        Text {
-                                            text: "󰝚"
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: Theme.fontPx(12)
-                                            color: Theme.primary
-                                        }
-
-                                        // Track title
-                                        Text {
-                                            text: "Do I Wanna Know? • Arctic Monkeys"
-                                            font.family: Theme.font
-                                            font.pixelSize: Theme.fontPx(10.5)
-                                            font.weight: Font.Medium
-                                            color: Qt.rgba(1, 1, 1, 0.85)
-                                        }
-                                    }
-
-                                    // Expanded State (Center Notch Pavilion with Animated Chronometer Preview)
-                                    ColumnLayout {
+                                    MouseArea {
+                                        id: centerDragArea
                                         anchors.fill: parent
-                                        anchors.margins: 14
-                                        visible: root.centerExpanded
-                                        spacing: 10
+                                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                                        drag.target: notchBarsContainer
+                                        drag.axis: Drag.YAxis
+                                        drag.minimumY: 0
+                                        drag.maximumY: Math.max(0, blueprintWorkspace.height - (root.centerExpanded ? 240 : root.previewNotchHeight) - 10)
+                                        onPositionChanged: {
+                                            if (pressed) root.notchBarsY = notchBarsContainer.y
+                                        }
+                                        onReleased: root.notchBarsY = notchBarsContainer.y
+                                        onClicked: {
+                                            root.centerExpanded = !root.centerExpanded
+                                        }
+                                    }
 
-                                        // Pavilion Header
-                                        RowLayout {
-                                            Layout.fillWidth: true
+                                    NotchContainer {
+                                        id: centerNotchBar
+                                        leftFillet: true
+                                        rightFillet: true
+                                        filletRadius: root.previewEarRadius
+                                        bottomRadius: root.centerExpanded ? 18 : root.previewBottomRadius
+                                        notchOpacity: root.previewNotchOpacity
+                                        implicitHeight: root.centerExpanded ? 240 : root.previewNotchHeight
+                                        implicitWidth: root.centerExpanded ? Math.min(blueprintWorkspace.width - 40, 560) : (contentImplicitWidth + (leftFillet ? filletRadius : 0) + (rightFillet ? filletRadius : 0) + (horizontalPadding * 2))
+                                        height: implicitHeight
+                                        width: implicitWidth
+                                        horizontalPadding: 12
+                                        contentSpacing: 8
+                                        mouseArea.enabled: false
 
+                                        // Compact Content (visible when not expanded)
+                                        Row {
+                                            id: centerBarContent
+                                            spacing: 8
+                                            visible: !root.centerExpanded
+
+                                            // Titan Clock
                                             Text {
-                                                text: "CENTER NOTCH PAVILION // PREVIEW"
-                                                font.family: Theme.fontMono
-                                                font.pixelSize: Theme.fontPx(9)
+                                                text: "10:19"
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(12.5)
                                                 font.weight: Font.Bold
                                                 color: Theme.primary
+                                                anchors.verticalCenter: parent.verticalCenter
                                             }
 
-                                            Item { Layout.fillWidth: true }
+                                            // Separator
+                                            Text {
+                                                text: "|"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(11)
+                                                color: Qt.rgba(1, 1, 1, 0.25)
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+
+                                            // Spinning Disc Glyph
+                                            Text {
+                                                text: "󰝚"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(12)
+                                                color: Theme.primary
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+
+                                            // Track title
+                                            Text {
+                                                text: "Do I Wanna Know? • Arctic Monkeys"
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(10.5)
+                                                font.weight: Font.Medium
+                                                color: Qt.rgba(1, 1, 1, 0.85)
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+                                        }
+
+                                        // Expanded Pavilion Content (reparented directly to centerNotchBar)
+                                        ColumnLayout {
+                                            id: centerExpandedContent
+                                            parent: centerNotchBar
+                                            anchors.fill: parent
+                                            anchors.margins: 14
+                                            anchors.leftMargin: root.previewEarRadius + 14
+                                            anchors.rightMargin: root.previewEarRadius + 14
+                                            visible: root.centerExpanded
+                                            spacing: 10
+                                            z: 5
+
+                                            // Pavilion Header
+                                            RowLayout {
+                                                Layout.fillWidth: true
+
+                                                Text {
+                                                    text: "CENTER NOTCH PAVILION // PREVIEW"
+                                                    font.family: Theme.fontMono
+                                                    font.pixelSize: Theme.fontPx(9)
+                                                    font.weight: Font.Bold
+                                                    color: Theme.primary
+                                                }
+
+                                                Item { Layout.fillWidth: true }
+
+                                                Rectangle {
+                                                    Layout.preferredWidth: 18
+                                                    Layout.preferredHeight: 18
+                                                    radius: 4
+                                                    color: Qt.rgba(1, 1, 1, 0.10)
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: "✕"
+                                                        font.pixelSize: 10
+                                                        color: Qt.rgba(1, 1, 1, 0.70)
+                                                    }
+
+                                                    MouseArea {
+                                                        anchors.fill: parent
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: root.centerExpanded = false
+                                                    }
+                                                }
+                                            }
+
+                                            // 3-Column Architecture
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Layout.fillHeight: true
+                                                spacing: 12
+
+                                                // Column 1: Tactical Agenda Preview
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    Layout.fillHeight: true
+                                                    radius: 8
+                                                    color: Qt.rgba(1, 1, 1, 0.03)
+                                                    border.color: Qt.rgba(1, 1, 1, 0.06)
+                                                    border.width: 1
+
+                                                    ColumnLayout {
+                                                        anchors.centerIn: parent
+                                                        spacing: 4
+
+                                                        Text {
+                                                            text: "[ IN PROGRESS ]"
+                                                            font.family: Theme.fontMono
+                                                            font.pixelSize: Theme.fontPx(9)
+                                                            font.weight: Font.Bold
+                                                            color: Theme.primary
+                                                        }
+                                                        Text {
+                                                            text: "Design Sync @ 11:30"
+                                                            font.family: Theme.font
+                                                            font.pixelSize: Theme.fontPx(10)
+                                                            color: Qt.rgba(1, 1, 1, 0.80)
+                                                        }
+                                                    }
+                                                }
+
+                                                // Column 2: Animated Tactical Chronometer Preview
+                                                Rectangle {
+                                                    Layout.preferredWidth: 180
+                                                    Layout.fillHeight: true
+                                                    radius: 10
+                                                    color: Qt.rgba(0, 0, 0, 0.35)
+                                                    border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
+                                                    border.width: 1
+                                                    clip: true
+
+                                                    TacticalChronometer {
+                                                        anchors.centerIn: parent
+                                                        width: parent.width - 8
+                                                        height: parent.height - 8
+                                                    }
+                                                }
+
+                                                // Column 3: Lyrics Stream Preview
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    Layout.fillHeight: true
+                                                    radius: 8
+                                                    color: Qt.rgba(1, 1, 1, 0.03)
+                                                    border.color: Qt.rgba(1, 1, 1, 0.06)
+                                                    border.width: 1
+
+                                                    ColumnLayout {
+                                                        anchors.centerIn: parent
+                                                        spacing: 4
+
+                                                        Text {
+                                                            text: "CAIRO // LYRICS"
+                                                            font.family: Theme.fontMono
+                                                            font.pixelSize: Theme.fontPx(8)
+                                                            color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.70)
+                                                        }
+                                                        Text {
+                                                            text: "Crawlin' back to you..."
+                                                            font.family: Theme.font
+                                                            font.pixelSize: Theme.fontPx(10.5)
+                                                            font.weight: Font.DemiBold
+                                                            color: Theme.primary
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ── 3. RIGHT NOTCH BAR (Flush Right Edge, Fillet on Left) ──
+                                Item {
+                                    id: rightBarWrapper
+                                    anchors.right: parent.right
+                                    y: 0
+                                    width: rightNotchBar.width
+                                    height: rightNotchBar.height
+                                    z: rightDragArea.pressed ? 10 : 2
+
+                                    MouseArea {
+                                        id: rightDragArea
+                                        anchors.fill: parent
+                                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                                        drag.target: notchBarsContainer
+                                        drag.axis: Drag.YAxis
+                                        drag.minimumY: 0
+                                        drag.maximumY: Math.max(0, blueprintWorkspace.height - (root.centerExpanded ? 240 : root.previewNotchHeight) - 10)
+                                        onPositionChanged: {
+                                            if (pressed) root.notchBarsY = notchBarsContainer.y
+                                        }
+                                        onReleased: root.notchBarsY = notchBarsContainer.y
+                                    }
+
+                                    NotchContainer {
+                                        id: rightNotchBar
+                                        leftFillet: true
+                                        rightFillet: false
+                                        filletRadius: root.previewEarRadius
+                                        bottomRadius: root.previewBottomRadius
+                                        notchOpacity: root.previewNotchOpacity
+                                        implicitHeight: root.previewNotchHeight
+                                        height: root.previewNotchHeight
+                                        horizontalPadding: 10
+                                        contentSpacing: 8
+                                        mouseArea.enabled: false
+
+                                        Row {
+                                            id: rightBarContent
+                                            spacing: 8
+
+                                            Text {
+                                                text: "󰕾"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(12)
+                                                color: Qt.rgba(1, 1, 1, 0.70)
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+
+                                            Text {
+                                                text: "󰤨"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(12)
+                                                color: Qt.rgba(1, 1, 1, 0.70)
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+
+                                            Text {
+                                                text: "󰁹 98%"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(10)
+                                                font.weight: Font.DemiBold
+                                                color: Theme.primary
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
 
                                             Rectangle {
-                                                Layout.preferredWidth: 18
-                                                Layout.preferredHeight: 18
+                                                width: 16
+                                                height: 16
                                                 radius: 4
-                                                color: Qt.rgba(1, 1, 1, 0.10)
+                                                color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20)
+                                                anchors.verticalCenter: parent.verticalCenter
 
                                                 Text {
                                                     anchors.centerIn: parent
-                                                    text: "✕"
+                                                    text: "󰐥"
+                                                    font.family: Theme.fontMono
                                                     font.pixelSize: 10
-                                                    color: Qt.rgba(1, 1, 1, 0.70)
-                                                }
-
-                                                MouseArea {
-                                                    anchors.fill: parent
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onClicked: root.centerExpanded = false
-                                                }
-                                            }
-                                        }
-
-                                        // 3-Column Architecture
-                                        RowLayout {
-                                            Layout.fillWidth: true
-                                            Layout.fillHeight: true
-                                            spacing: 12
-
-                                            // Column 1: Tactical Agenda Preview
-                                            Rectangle {
-                                                Layout.fillWidth: true
-                                                Layout.fillHeight: true
-                                                radius: 8
-                                                color: Qt.rgba(1, 1, 1, 0.03)
-                                                border.color: Qt.rgba(1, 1, 1, 0.06)
-                                                border.width: 1
-
-                                                ColumnLayout {
-                                                    anchors.centerIn: parent
-                                                    spacing: 4
-
-                                                    Text {
-                                                        text: "[ IN PROGRESS ]"
-                                                        font.family: Theme.fontMono
-                                                        font.pixelSize: Theme.fontPx(9)
-                                                        font.weight: Font.Bold
-                                                        color: Theme.primary
-                                                    }
-                                                    Text {
-                                                        text: "Design Sync @ 11:30"
-                                                        font.family: Theme.font
-                                                        font.pixelSize: Theme.fontPx(10)
-                                                        color: Qt.rgba(1, 1, 1, 0.80)
-                                                    }
-                                                }
-                                            }
-
-                                            // Column 2: THE ANIMATED CLOCK (Chronometer Design Preview)
-                                            Rectangle {
-                                                Layout.preferredWidth: 180
-                                                Layout.fillHeight: true
-                                                radius: 10
-                                                color: Qt.rgba(0, 0, 0, 0.35)
-                                                border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
-                                                border.width: 1
-                                                clip: true
-
-                                                // Embedded Tactical Chronometer
-                                                TacticalChronometer {
-                                                    anchors.centerIn: parent
-                                                    width: parent.width - 8
-                                                    height: parent.height - 8
-                                                }
-                                            }
-
-                                            // Column 3: Lyrics Stream Preview
-                                            Rectangle {
-                                                Layout.fillWidth: true
-                                                Layout.fillHeight: true
-                                                radius: 8
-                                                color: Qt.rgba(1, 1, 1, 0.03)
-                                                border.color: Qt.rgba(1, 1, 1, 0.06)
-                                                border.width: 1
-
-                                                ColumnLayout {
-                                                    anchors.centerIn: parent
-                                                    spacing: 4
-
-                                                    Text {
-                                                        text: "CAIRO // LYRICS"
-                                                        font.family: Theme.fontMono
-                                                        font.pixelSize: Theme.fontPx(8)
-                                                        color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.70)
-                                                    }
-                                                    Text {
-                                                        text: "Crawlin' back to you..."
-                                                        font.family: Theme.font
-                                                        font.pixelSize: Theme.fontPx(10.5)
-                                                        font.weight: Font.DemiBold
-                                                        color: Theme.primary
-                                                    }
+                                                    color: Theme.primary
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
-
-                            // ── 3. RIGHT NOTCH BAR (Draggable Y-Only) ───────
-                            Item {
-                                id: rightBarWrapper
-                                anchors.right: parent.right
-                                anchors.rightMargin: 20
-                                y: root.rightBarY
-                                width: rightBarCard.width
-                                height: rightBarCard.height
-                                z: rightDragArea.pressed ? 10 : 2
-
-                                DragHandler {
-                                    id: rightDragHandler
-                                    target: rightBarWrapper
-                                    xAxis.enabled: false
-                                    yAxis.enabled: true
-                                    yAxis.minimum: 0
-                                    yAxis.maximum: Math.max(0, blueprintWorkspace.height - rightBarWrapper.height - 10)
-                                }
-
-                                MouseArea {
-                                    id: rightDragArea
-                                    anchors.fill: parent
-                                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-                                    drag.target: rightBarWrapper
-                                    drag.axis: Drag.YAxis
-                                    drag.minimumY: 0
-                                    drag.maximumY: Math.max(0, blueprintWorkspace.height - rightBarWrapper.height - 10)
-                                    onReleased: root.rightBarY = rightBarWrapper.y
-                                }
-
-                                Rectangle {
-                                    id: rightBarCard
-                                    width: rightBarContent.implicitWidth + 24
-                                    height: root.previewNotchHeight
-                                    radius: root.previewBottomRadius
-                                    color: Qt.rgba(0.04, 0.04, 0.06, root.previewNotchOpacity)
-                                    border.color: rightDragArea.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.50) : Qt.rgba(1, 1, 1, 0.14)
-                                    border.width: 1
-
-                                    RowLayout {
-                                        id: rightBarContent
-                                        anchors.centerIn: parent
-                                        spacing: 8
-
-                                        Text {
-                                            text: "󰕾"
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: Theme.fontPx(12)
-                                            color: Qt.rgba(1, 1, 1, 0.70)
-                                        }
-
-                                        Text {
-                                            text: "󰤨"
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: Theme.fontPx(12)
-                                            color: Qt.rgba(1, 1, 1, 0.70)
-                                        }
-
-                                        Text {
-                                            text: "󰁹 98%"
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: Theme.fontPx(10)
-                                            font.weight: Font.DemiBold
-                                            color: Theme.primary
-                                        }
-
-                                        Rectangle {
-                                            Layout.preferredWidth: 16
-                                            Layout.preferredHeight: 16
-                                            radius: 4
-                                            color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20)
-
-                                            Text {
-                                                anchors.centerIn: parent
-                                                text: "󰐥"
-                                                font.family: Theme.fontMono
-                                                font.pixelSize: 10
-                                                color: Theme.primary
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                            } // end notchBarsContainer
+                        } // end blueprintWorkspace
+                } // end blueprintCard
+            } // end blueprintSection
 
                 // ── 2b. Separator Hairline with Reset Bar Button ────────────
                 Rectangle {
@@ -1462,37 +1670,1480 @@ Item {
             }
 
             // ---------------------------------------------------------------
-            // MODE 2: VANISH (NUCLEUS) (Placeholder for Next Iteration)
+            // MODE 2: VANISH // NUCLEUS (Barless sp³ Radial Desktop Studio)
             // ---------------------------------------------------------------
             ColumnLayout {
-                anchors.centerIn: parent
+                anchors.fill: parent
                 visible: root.currentMode === 2
-                spacing: 12
+                spacing: 0
 
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "󱐋"
-                    font.family: Theme.fontMono
-                    font.pixelSize: Theme.fontPx(36)
-                    color: Theme.primary
+                // ── 1. Blueprint Canvas Preview Section ────────────────────
+                Item {
+                    id: vanishBlueprintSection
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: root.vanishMediaPlaying ? 400 : 330
+                    Layout.minimumHeight: 280
+                    clip: true
+
+                    Behavior on Layout.preferredHeight {
+                        NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+                    }
+
+                    // Inset Rounded Card Container with 1px border
+                    Rectangle {
+                        id: vanishBlueprintCard
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        radius: 14
+                        color: Qt.rgba(0, 0, 0, 0.40)
+                        border.color: Qt.rgba(1, 1, 1, 0.12)
+                        border.width: 1
+                        clip: true
+
+                        // Dotted Matrix Grid Canvas (Crisp 1.2px dots, 18px grid)
+                        Canvas {
+                            id: vanishBlueprintDots
+                            anchors.fill: parent
+                            opacity: 0.22
+                            onPaint: {
+                                var ctx = getContext("2d")
+                                ctx.clearRect(0, 0, width, height)
+                                ctx.fillStyle = "#FFFFFF"
+                                var spacing = 18
+                                for (var x = spacing / 2; x < width; x += spacing) {
+                                    for (var y = spacing / 2; y < height; y += spacing) {
+                                        ctx.beginPath()
+                                        ctx.arc(x, y, 1.2, 0, Math.PI * 2)
+                                        ctx.fill()
+                                    }
+                                }
+                            }
+                        }
+
+                        // Top Ruler & Info Header
+                        Rectangle {
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            height: 24
+                            color: Qt.rgba(0, 0, 0, 0.35)
+                            border.color: Qt.rgba(1, 1, 1, 0.06)
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+
+                                Text {
+                                    text: "BLUEPRINT // VANISH MODE (BARLESS SP³ HYBRID NUCLEUS)"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontPx(8.5)
+                                    font.weight: Font.Bold
+                                    color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.85)
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                // Interactive Music Preview Toggle Switch / Pill
+                                Rectangle {
+                                    Layout.preferredHeight: 18
+                                    Layout.preferredWidth: mediaToggleRow.implicitWidth + 14
+                                    radius: 999
+                                    color: root.vanishMediaPlaying ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22) : Qt.rgba(1, 1, 1, 0.06)
+                                    border.color: root.vanishMediaPlaying ? Theme.primary : Qt.rgba(1, 1, 1, 0.14)
+                                    border.width: 1
+
+                                    RowLayout {
+                                        id: mediaToggleRow
+                                        anchors.centerIn: parent
+                                        spacing: 5
+
+                                        Text {
+                                            text: root.vanishMediaPlaying ? "󰝚" : "󰝛"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontPx(9.5)
+                                            color: root.vanishMediaPlaying ? Theme.primary : Qt.rgba(1, 1, 1, 0.45)
+                                        }
+
+                                        Text {
+                                            text: root.vanishMediaPlaying ? "MUSIC PLAYING: ON" : "MUSIC: OFF (RESTING)"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontPx(8)
+                                            font.weight: Font.Bold
+                                            color: root.vanishMediaPlaying ? Theme.primary : Qt.rgba(1, 1, 1, 0.60)
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.vanishMediaPlaying = !root.vanishMediaPlaying
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Blueprint Screen Workspace ─────────────────────
+                        Item {
+                            id: vanishWorkspace
+                            anchors.fill: parent
+                            anchors.topMargin: 24
+
+                            // ── Center Vanish Hub System ──
+                            Item {
+                                id: vanishHubContainer
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                y: root.vanishMediaPlaying ? 24 : 50
+                                width: 360
+                                height: 200
+
+                                Behavior on y {
+                                    NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
+                                }
+
+                                // 60fps continuous phase accumulator for preview orbit spin
+                                property real previewPhase: 0.0
+                                Timer {
+                                    interval: 16
+                                    running: root.currentMode === 2
+                                    repeat: true
+                                    onTriggered: {
+                                        vanishHubContainer.previewPhase = (vanishHubContainer.previewPhase + 0.02) % 628.3
+                                    }
+                                }
+
+                                // ── Orbital Guide Rings & Rotating Carbon Valence Electrons ──
+                                Canvas {
+                                    id: vanishOrbitsCanvas
+                                    anchors.centerIn: parent
+                                    width: 240
+                                    height: 240
+                                    z: 1
+
+                                    Connections {
+                                        target: vanishHubContainer
+                                        function onPreviewPhaseChanged() {
+                                            vanishOrbitsCanvas.requestPaint()
+                                        }
+                                    }
+
+                                    onPaint: {
+                                        var ctx = getContext("2d")
+                                        ctx.clearRect(0, 0, width, height)
+                                        var cx = width / 2
+                                        var cy = height / 2
+                                        var phase = vanishHubContainer.previewPhase
+                                        var primaryCol = Theme.primary
+
+                                        // Orbit Ring 1 (Inner, r = 46px)
+                                        ctx.save()
+                                        ctx.lineWidth = 1
+                                        ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.08)
+                                        ctx.setLineDash([4, 4])
+                                        ctx.beginPath()
+                                        ctx.arc(cx, cy, 46, 0, Math.PI * 2)
+                                        ctx.stroke()
+                                        ctx.restore()
+
+                                        // 2 Inner Electrons (moving along Ring 1)
+                                        var e1_angle = phase * 0.4
+                                        for (var k = 0; k < 2; k++) {
+                                            var a = e1_angle + (k * Math.PI)
+                                            var ex = cx + 46 * Math.cos(a)
+                                            var ey = cy + 46 * Math.sin(a)
+                                            ctx.fillStyle = primaryCol
+                                            ctx.beginPath()
+                                            ctx.arc(ex, ey, 2.5, 0, Math.PI * 2)
+                                            ctx.fill()
+                                        }
+
+                                        // Orbit Ring 2 (Outer, r = 82px)
+                                        ctx.save()
+                                        ctx.lineWidth = 1
+                                        ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.06)
+                                        ctx.setLineDash([3, 5])
+                                        ctx.beginPath()
+                                        ctx.arc(cx, cy, 82, 0, Math.PI * 2)
+                                        ctx.stroke()
+                                        ctx.restore()
+
+                                        // 4 Outer Valence Electrons (moving counter-clockwise)
+                                        var e2_angle = -phase * 0.28
+                                        for (var j = 0; j < 4; j++) {
+                                            var a2 = e2_angle + (j * (Math.PI / 2))
+                                            var ex2 = cx + 82 * Math.cos(a2)
+                                            var ey2 = cy + 82 * Math.sin(a2)
+                                            ctx.fillStyle = primaryCol
+                                            ctx.beginPath()
+                                            ctx.arc(ex2, ey2, 2.5, 0, Math.PI * 2)
+                                            ctx.fill()
+                                        }
+
+                                        // Dotted Tracers connecting Center to the 4 Satellites (-65°, 25°, 135°, 205°)
+                                        var satAngles = [-65 * Math.PI / 180, 25 * Math.PI / 180, 135 * Math.PI / 180, 205 * Math.PI / 180]
+                                        ctx.save()
+                                        ctx.lineWidth = 1
+                                        ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.12)
+                                        ctx.setLineDash([2, 4])
+                                        for (var s = 0; s < 4; s++) {
+                                            ctx.beginPath()
+                                            ctx.moveTo(cx, cy)
+                                            ctx.lineTo(cx + 95 * Math.cos(satAngles[s]), cy + 95 * Math.sin(satAngles[s]))
+                                            ctx.stroke()
+                                        }
+                                        ctx.restore()
+                                    }
+                                }
+
+                                // ── 4 Radial sp³ Satellites ──
+                                // 1. Top-Left (-65°): Connect / Mixer
+                                Rectangle {
+                                    x: (parent.width / 2) + 95 * Math.cos(-65 * Math.PI / 180) - (width / 2)
+                                    y: (parent.height / 2) + 95 * Math.sin(-65 * Math.PI / 180) - (height / 2)
+                                    width: 34
+                                    height: 34
+                                    radius: 17
+                                    z: 4
+                                    color: Qt.rgba(0.06, 0.07, 0.09, 0.90)
+                                    border.color: sat1Mouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.18)
+                                    border.width: 1.2
+                                    scale: sat1Mouse.containsMouse ? 1.12 : 1.0
+                                    Behavior on scale { NumberAnimation { duration: 140 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "󰕾"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontPx(13)
+                                        color: sat1Mouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.80)
+                                    }
+
+                                    MouseArea {
+                                        id: sat1Mouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
+                                }
+
+                                // 2. Top-Right (25°): Launcher
+                                Rectangle {
+                                    x: (parent.width / 2) + 95 * Math.cos(25 * Math.PI / 180) - (width / 2)
+                                    y: (parent.height / 2) + 95 * Math.sin(25 * Math.PI / 180) - (height / 2)
+                                    width: 34
+                                    height: 34
+                                    radius: 17
+                                    z: 4
+                                    color: Qt.rgba(0.06, 0.07, 0.09, 0.90)
+                                    border.color: sat2Mouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.18)
+                                    border.width: 1.2
+                                    scale: sat2Mouse.containsMouse ? 1.12 : 1.0
+                                    Behavior on scale { NumberAnimation { duration: 140 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "󰀻"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontPx(13)
+                                        color: sat2Mouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.80)
+                                    }
+
+                                    MouseArea {
+                                        id: sat2Mouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
+                                }
+
+                                // 3. Bottom-Right (135°): Spaces / Workspaces
+                                Rectangle {
+                                    x: (parent.width / 2) + 95 * Math.cos(135 * Math.PI / 180) - (width / 2)
+                                    y: (parent.height / 2) + 95 * Math.sin(135 * Math.PI / 180) - (height / 2)
+                                    width: 34
+                                    height: 34
+                                    radius: 17
+                                    z: 4
+                                    color: Qt.rgba(0.06, 0.07, 0.09, 0.90)
+                                    border.color: sat3Mouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.18)
+                                    border.width: 1.2
+                                    scale: sat3Mouse.containsMouse ? 1.12 : 1.0
+                                    Behavior on scale { NumberAnimation { duration: 140 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "󰍹"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontPx(13)
+                                        color: sat3Mouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.80)
+                                    }
+
+                                    MouseArea {
+                                        id: sat3Mouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
+                                }
+
+                                // 4. Bottom-Left (205°): Alerts & System
+                                Rectangle {
+                                    x: (parent.width / 2) + 95 * Math.cos(205 * Math.PI / 180) - (width / 2)
+                                    y: (parent.height / 2) + 95 * Math.sin(205 * Math.PI / 180) - (height / 2)
+                                    width: 34
+                                    height: 34
+                                    radius: 17
+                                    z: 4
+                                    color: Qt.rgba(0.06, 0.07, 0.09, 0.90)
+                                    border.color: sat4Mouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.18)
+                                    border.width: 1.2
+                                    scale: sat4Mouse.containsMouse ? 1.12 : 1.0
+                                    Behavior on scale { NumberAnimation { duration: 140 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "󰂚"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontPx(13)
+                                        color: sat4Mouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.80)
+                                    }
+
+                                    MouseArea {
+                                        id: sat4Mouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
+                                }
+
+                                // ── Center Core Disc ──
+                                Rectangle {
+                                    id: vanishCoreDisc
+                                    anchors.centerIn: parent
+                                    width: 58
+                                    height: 58
+                                    radius: 29
+                                    z: 5
+                                    color: Qt.rgba(0.04, 0.05, 0.07, 0.96)
+                                    border.color: root.vanishMediaPlaying ? Theme.primary : Qt.rgba(1, 1, 1, 0.22)
+                                    border.width: 1.5
+
+                                    // Pulsing Halo Glow when media is playing
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: parent.width + 10
+                                        height: parent.height + 10
+                                        radius: width / 2
+                                        color: "transparent"
+                                        border.color: Theme.primary
+                                        border.width: 1
+                                        opacity: root.vanishMediaPlaying ? 0.45 : 0.0
+                                        z: -1
+                                        Behavior on opacity { NumberAnimation { duration: 250 } }
+                                    }
+
+                                    ColumnLayout {
+                                        anchors.centerIn: parent
+                                        spacing: 1
+
+                                        Text {
+                                            text: "13:42"
+                                            font.family: Theme.font
+                                            font.pixelSize: Theme.fontPx(11.5)
+                                            font.weight: Font.Bold
+                                            color: Theme.primary
+                                            Layout.alignment: Qt.AlignHCenter
+                                        }
+
+                                        Text {
+                                            text: "OCT 31"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontPx(7.5)
+                                            color: Qt.rgba(1, 1, 1, 0.55)
+                                            Layout.alignment: Qt.AlignHCenter
+                                        }
+                                    }
+                                }
+                            }
+
+                            // ── Organic Music Player & Synced Lyrics Overlay (Appears below Nucleus when Media is Playing) ──
+                            Item {
+                                id: vanishMediaCard
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.top: vanishHubContainer.bottom
+                                anchors.topMargin: 12
+                                width: Math.min(parent.width - 32, 420)
+                                height: 74
+                                visible: opacity > 0.01
+                                opacity: root.vanishMediaPlaying ? 1.0 : 0.0
+                                scale: root.vanishMediaPlaying ? 1.0 : 0.92
+
+                                Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                                Behavior on scale { NumberAnimation { duration: 260; easing.type: Easing.OutBack; easing.overshoot: 1.08 } }
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 12
+                                    color: Qt.rgba(0.04, 0.05, 0.08, 0.85)
+                                    border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
+                                    border.width: 1
+                                    clip: true
+
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 8
+                                        spacing: 4
+
+                                        // Top Row: Album Art + Track Info + Transport Controls
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+
+                                            // Rotating Vinyl / Album Art Micro-Orb
+                                            Rectangle {
+                                                Layout.preferredWidth: 28
+                                                Layout.preferredHeight: 28
+                                                radius: 14
+                                                color: Qt.rgba(0, 0, 0, 0.50)
+                                                border.color: Theme.primary
+                                                border.width: 1.2
+                                                clip: true
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: "󰝚"
+                                                    font.family: Theme.fontMono
+                                                    font.pixelSize: 13
+                                                    color: Theme.primary
+                                                }
+
+                                                RotationAnimation on rotation {
+                                                    running: root.vanishMediaPlaying
+                                                    loops: Animation.Infinite
+                                                    from: 0
+                                                    to: 360
+                                                    duration: 4000
+                                                }
+                                            }
+
+                                            // Track & Artist Title
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 1
+
+                                                Text {
+                                                    text: "Do I Wanna Know?"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(11.5)
+                                                    font.weight: Font.Bold
+                                                    color: Qt.rgba(1, 1, 0.95, 1.0)
+                                                    elide: Text.ElideRight
+                                                    Layout.fillWidth: true
+                                                }
+
+                                                Text {
+                                                    text: "Arctic Monkeys • AM"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(9.5)
+                                                    color: Qt.rgba(1, 1, 1, 0.55)
+                                                    elide: Text.ElideRight
+                                                    Layout.fillWidth: true
+                                                }
+                                            }
+
+                                            // Valence Circular Transport Buttons
+                                            RowLayout {
+                                                spacing: 6
+
+                                                // Skip Previous
+                                                Rectangle {
+                                                    Layout.preferredWidth: 22
+                                                    Layout.preferredHeight: 22
+                                                    radius: 11
+                                                    color: Qt.rgba(1, 1, 1, 0.08)
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: "󰒮"
+                                                        font.family: Theme.fontMono
+                                                        font.pixelSize: 11
+                                                        color: Qt.rgba(1, 1, 1, 0.75)
+                                                    }
+                                                }
+
+                                                // Play / Pause (Accent)
+                                                Rectangle {
+                                                    Layout.preferredWidth: 24
+                                                    Layout.preferredHeight: 24
+                                                    radius: 12
+                                                    color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.25)
+                                                    border.color: Theme.primary
+                                                    border.width: 1
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: "󰏤"
+                                                        font.family: Theme.fontMono
+                                                        font.pixelSize: 12
+                                                        color: Theme.primary
+                                                    }
+                                                }
+
+                                                // Skip Next
+                                                Rectangle {
+                                                    Layout.preferredWidth: 22
+                                                    Layout.preferredHeight: 22
+                                                    radius: 11
+                                                    color: Qt.rgba(1, 1, 1, 0.08)
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: "󰒭"
+                                                        font.family: Theme.fontMono
+                                                        font.pixelSize: 11
+                                                        color: Qt.rgba(1, 1, 1, 0.75)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Bottom Row: Scrubber Bar + Live Lyric Line
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+
+                                            // Scrubber Bar
+                                            Rectangle {
+                                                Layout.preferredWidth: 100
+                                                Layout.preferredHeight: 3
+                                                radius: 1.5
+                                                color: Qt.rgba(1, 1, 1, 0.12)
+
+                                                Rectangle {
+                                                    width: parent.width * 0.42
+                                                    height: parent.height
+                                                    radius: parent.radius
+                                                    color: Theme.primary
+                                                }
+                                            }
+
+                                            Text {
+                                                text: "01:42"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(8)
+                                                color: Qt.rgba(1, 1, 1, 0.40)
+                                            }
+
+                                            Item { Layout.fillWidth: true }
+
+                                            // Floating Synced Lyric Line
+                                            RowLayout {
+                                                spacing: 4
+                                                Text {
+                                                    text: "󰎈"
+                                                    font.family: Theme.fontMono
+                                                    font.pixelSize: Theme.fontPx(9)
+                                                    color: Theme.primary
+                                                }
+                                                Text {
+                                                    text: "\"Crawlin' back to you...\""
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(10)
+                                                    font.italic: true
+                                                    color: Theme.primary
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "VANISH // NUCLEUS MODE"
-                    font.family: Theme.font
-                    font.pixelSize: Theme.fontPx(16)
-                    font.weight: Font.Bold
-                    color: Qt.rgba(1, 1, 1, 0.95)
+                // ── 2. Separator Hairline ──────────────────────────────────
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Qt.rgba(1, 1, 1, 0.08)
                 }
 
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "Zero permanent screen chrome. Central orbital nucleus hub with radial satellites.\nCustomizer modules for Vanish mode will be configured here."
-                    font.family: Theme.font
-                    font.pixelSize: Theme.fontPx(11.5)
-                    color: Qt.rgba(1, 1, 1, 0.50)
-                    horizontalAlignment: Text.AlignHCenter
+                // ── 3. Sub-Section Switcher: "Designs" vs "Settings" ───────
+                Item {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 44
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
+
+                    RowLayout {
+                        anchors.fill: parent
+
+                        // Segmented Tab Switcher
+                        Rectangle {
+                            height: 30
+                            width: 180
+                            radius: 8
+                            color: Qt.rgba(0, 0, 0, 0.25)
+                            border.color: Qt.rgba(1, 1, 1, 0.08)
+                            border.width: 1
+
+                            RowLayout {
+                                anchors.fill: parent
+                                spacing: 0
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 7
+                                    color: root.vanishSubSection === "Designs" ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20) : "transparent"
+                                    border.color: root.vanishSubSection === "Designs" ? Theme.primary : "transparent"
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "󰙵  Designs"
+                                        font.family: Theme.font
+                                        font.pixelSize: Theme.fontPx(11)
+                                        font.weight: root.vanishSubSection === "Designs" ? Font.Bold : Font.Normal
+                                        color: root.vanishSubSection === "Designs" ? Theme.primary : Qt.rgba(1, 1, 1, 0.65)
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.vanishSubSection = "Designs"
+                                    }
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    radius: 7
+                                    color: root.vanishSubSection === "Settings" ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20) : "transparent"
+                                    border.color: root.vanishSubSection === "Settings" ? Theme.primary : "transparent"
+                                    border.width: 1
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "󰒓  Settings"
+                                        font.family: Theme.font
+                                        font.pixelSize: Theme.fontPx(11)
+                                        font.weight: root.vanishSubSection === "Settings" ? Font.Bold : Font.Normal
+                                        color: root.vanishSubSection === "Settings" ? Theme.primary : Qt.rgba(1, 1, 1, 0.65)
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.vanishSubSection = "Settings"
+                                    }
+                                }
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        // Quick Toggle Media Preview Button in sub-header
+                        Rectangle {
+                            height: 28
+                            width: vanishPreviewBtnText.implicitWidth + 24
+                            radius: 6
+                            color: vanishPreviewBtnMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.20)
+                            border.color: vanishPreviewBtnMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(1, 1, 1, 0.10)
+                            border.width: 1
+
+                            Text {
+                                id: vanishPreviewBtnText
+                                anchors.centerIn: parent
+                                text: root.vanishMediaPlaying ? "󰝛  Hide Media View" : "󰝚  Show Media View"
+                                font.family: Theme.fontMono
+                                font.pixelSize: Theme.fontPx(10)
+                                color: Qt.rgba(1, 1, 1, 0.75)
+                            }
+
+                            MouseArea {
+                                id: vanishPreviewBtnMouse
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.vanishMediaPlaying = !root.vanishMediaPlaying
+                            }
+                        }
+                    }
+                }
+
+                // ── 4. Scrollable Controls Body ────────────────────────────
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    Flickable {
+                        id: vanishControlsFlickable
+                        anchors.fill: parent
+                        contentWidth: width
+                        contentHeight: vanishControlsColumn.implicitHeight + 30
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        ColumnLayout {
+                            id: vanishControlsColumn
+                            width: vanishControlsFlickable.width - 32
+                            x: 16
+                            y: 8
+                            spacing: 14
+
+                            // ===============================================
+                            // SUB-SECTION 1: DESIGNS (Empty placeholder slots)
+                            // ===============================================
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: root.vanishSubSection === "Designs"
+                                spacing: 14
+
+                                // Section Heading
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Text {
+                                        text: "VANISH NUCLEUS // THEMES & ORBITAL VARIATIONS"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontPx(11)
+                                        font.weight: Font.Bold
+                                        color: Qt.rgba(1, 1, 1, 0.90)
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    Text {
+                                        text: "BARLESS SP³ TOPOLOGY"
+                                        font.family: Theme.fontMono
+                                        font.pixelSize: Theme.fontPx(9)
+                                        color: Theme.primary
+                                    }
+                                }
+
+                                // Grid of Variations: 1 active default + empty coming-soon cards
+                                Flow {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    // Active Card: sp3 Hybrid Orbital
+                                    Rectangle {
+                                        width: 260
+                                        height: 120
+                                        radius: 10
+                                        color: Qt.rgba(0.05, 0.06, 0.08, 0.80)
+                                        border.color: Theme.primary
+                                        border.width: 1.5
+
+                                        ColumnLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 6
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Text {
+                                                    text: "󱐋"
+                                                    font.family: Theme.fontMono
+                                                    font.pixelSize: Theme.fontPx(16)
+                                                    color: Theme.primary
+                                                }
+                                                Text {
+                                                    text: "sp³ Hybrid Orbital"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(12)
+                                                    font.weight: Font.Bold
+                                                    color: "#FFFFFF"
+                                                }
+                                                Item { Layout.fillWidth: true }
+                                                Rectangle {
+                                                    Layout.preferredWidth: 50
+                                                    Layout.preferredHeight: 18
+                                                    radius: 4
+                                                    color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20)
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: "ACTIVE"
+                                                        font.family: Theme.fontMono
+                                                        font.pixelSize: Theme.fontPx(8)
+                                                        font.weight: Font.Bold
+                                                        color: Theme.primary
+                                                    }
+                                                }
+                                            }
+
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: "Tetrahedral 4-satellite valence system with continuous electron spin and floating media."
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(10)
+                                                color: Qt.rgba(1, 1, 1, 0.60)
+                                                wrapMode: Text.WordWrap
+                                            }
+                                        }
+                                    }
+
+                                    // Empty Slot 1: Coming Soon
+                                    Rectangle {
+                                        width: 260
+                                        height: 120
+                                        radius: 10
+                                        color: Qt.rgba(0, 0, 0, 0.15)
+                                        border.color: Qt.rgba(1, 1, 1, 0.10)
+                                        border.width: 1
+
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 6
+
+                                            Text {
+                                                text: "󰐕"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(22)
+                                                color: Qt.rgba(1, 1, 1, 0.25)
+                                                Layout.alignment: Qt.AlignHCenter
+                                            }
+
+                                            Text {
+                                                text: "Variation Slot #2"
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(11.5)
+                                                font.weight: Font.Bold
+                                                color: Qt.rgba(1, 1, 1, 0.50)
+                                                Layout.alignment: Qt.AlignHCenter
+                                            }
+
+                                            Text {
+                                                text: "No variations created yet"
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(9.5)
+                                                color: Qt.rgba(1, 1, 1, 0.30)
+                                                Layout.alignment: Qt.AlignHCenter
+                                            }
+                                        }
+                                    }
+
+                                    // Empty Slot 2: Coming Soon
+                                    Rectangle {
+                                        width: 260
+                                        height: 120
+                                        radius: 10
+                                        color: Qt.rgba(0, 0, 0, 0.15)
+                                        border.color: Qt.rgba(1, 1, 1, 0.10)
+                                        border.width: 1
+
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 6
+
+                                            Text {
+                                                text: "󰐕"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(22)
+                                                color: Qt.rgba(1, 1, 1, 0.25)
+                                                Layout.alignment: Qt.AlignHCenter
+                                            }
+
+                                            Text {
+                                                text: "Variation Slot #3"
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(11.5)
+                                                font.weight: Font.Bold
+                                                color: Qt.rgba(1, 1, 1, 0.50)
+                                                Layout.alignment: Qt.AlignHCenter
+                                            }
+
+                                            Text {
+                                                text: "No variations created yet"
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(9.5)
+                                                color: Qt.rgba(1, 1, 1, 0.30)
+                                                Layout.alignment: Qt.AlignHCenter
+                                            }
+                                        }
+                                    }
+
+                                    // Create Custom Variation Slot
+                                    Rectangle {
+                                        width: 260
+                                        height: 120
+                                        radius: 10
+                                        color: createVarMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : Qt.rgba(0, 0, 0, 0.12)
+                                        border.color: createVarMouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.10)
+                                        border.width: 1
+
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 6
+
+                                            Text {
+                                                text: "󰐕"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(20)
+                                                color: createVarMouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.35)
+                                                Layout.alignment: Qt.AlignHCenter
+                                            }
+
+                                            Text {
+                                                text: "+ New Orbital Variation"
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(11)
+                                                font.weight: Font.Bold
+                                                color: createVarMouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.60)
+                                                Layout.alignment: Qt.AlignHCenter
+                                            }
+
+                                            Text {
+                                                text: "Studio builder coming in update"
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(9)
+                                                color: Qt.rgba(1, 1, 1, 0.30)
+                                                Layout.alignment: Qt.AlignHCenter
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: createVarMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                        }
+                                    }
+                                }
+                            }
+
+                            // ===============================================
+                            // SUB-SECTION 2: SETTINGS (Live Vanish Mode Settings)
+                            // ===============================================
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                visible: root.vanishSubSection === "Settings"
+                                spacing: 14
+
+                                // ── Card 1: Transition Dynamics ───────────
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: transCol.implicitHeight + 28
+                                    radius: 12
+                                    color: Qt.rgba(0, 0, 0, 0.22)
+                                    border.color: Qt.rgba(1, 1, 1, 0.08)
+                                    border.width: 1
+
+                                    ColumnLayout {
+                                        id: transCol
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 12
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Text {
+                                                text: "TRANSITION DYNAMICS"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(10)
+                                                font.weight: Font.Bold
+                                                color: Theme.primary
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            Text {
+                                                text: root.vanishTransitionEnabled ? "ENABLED" : "DIRECT"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(9)
+                                                color: Qt.rgba(1, 1, 1, 0.45)
+                                            }
+                                        }
+
+                                        // Toggle: Enable Cinematic Transition Overlay
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                Text {
+                                                    text: "Cinematic Transition Overlay"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(11.5)
+                                                    font.weight: Font.Medium
+                                                    color: "#FFFFFF"
+                                                }
+                                                Text {
+                                                    text: "Play full-screen cinematic overlay when opening or vanishing the hub."
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(9.5)
+                                                    color: Qt.rgba(1, 1, 1, 0.45)
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                Layout.preferredWidth: 38
+                                                Layout.preferredHeight: 20
+                                                radius: 10
+                                                color: root.vanishTransitionEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.15)
+
+                                                Rectangle {
+                                                    x: root.vanishTransitionEnabled ? parent.width - width - 2 : 2
+                                                    y: 2
+                                                    width: 16
+                                                    height: 16
+                                                    radius: 8
+                                                    color: root.vanishTransitionEnabled ? (Theme.m3onPrimary || "#000000") : "#FFFFFF"
+
+                                                    Behavior on x {
+                                                        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        root.vanishTransitionEnabled = !root.vanishTransitionEnabled
+                                                        root.saveVanishConfig("nucleus.transition", root.vanishTransitionEnabled)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Slider: Transition Duration
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 12
+
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                Text {
+                                                    text: "Transition Duration"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(11.5)
+                                                    font.weight: Font.Medium
+                                                    color: "#FFFFFF"
+                                                }
+                                                Text {
+                                                    text: "Length of the wallpaper blur, satellite expansion, and atom collapse."
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(9.5)
+                                                    color: Qt.rgba(1, 1, 1, 0.45)
+                                                }
+                                            }
+
+                                            Slider {
+                                                Layout.preferredWidth: 160
+                                                from: 300
+                                                to: 1500
+                                                stepSize: 50
+                                                value: root.vanishWallpaperDuration
+                                                onMoved: {
+                                                    root.vanishWallpaperDuration = Math.round(value)
+                                                    root.saveVanishConfig("wallpaperDuration", root.vanishWallpaperDuration)
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                Layout.preferredWidth: 54
+                                                Layout.preferredHeight: 22
+                                                radius: 4
+                                                color: Qt.rgba(1, 1, 1, 0.08)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: root.vanishWallpaperDuration + " ms"
+                                                    font.family: Theme.fontMono
+                                                    font.pixelSize: Theme.fontPx(9)
+                                                    color: Theme.primary
+                                                }
+                                            }
+                                        }
+
+                                        // Option Selector: Transition Wordmark
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+
+                                            ColumnLayout {
+                                                Layout.preferredWidth: 150
+                                                spacing: 2
+                                                Text {
+                                                    text: "Transition Wordmark"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(11.5)
+                                                    font.weight: Font.Medium
+                                                    color: "#FFFFFF"
+                                                }
+                                                Text {
+                                                    text: "Text displayed momentarily."
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(9.5)
+                                                    color: Qt.rgba(1, 1, 1, 0.45)
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+
+                                                Repeater {
+                                                    model: ["Wooshh!!", "Vanish", "Hyperdrive", "Quantum", "Zero"]
+                                                    delegate: Rectangle {
+                                                        required property string modelData
+                                                        readonly property bool isSelected: root.vanishTransitionWord === modelData
+
+                                                        Layout.fillWidth: true
+                                                        Layout.preferredHeight: 24
+                                                        radius: 6
+                                                        color: isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22) : (wordMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent")
+                                                        border.color: isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.12)
+                                                        border.width: 1
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: modelData
+                                                            font.family: Theme.font
+                                                            font.pixelSize: Theme.fontPx(10)
+                                                            font.weight: isSelected ? Font.Bold : Font.Normal
+                                                            color: isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.70)
+                                                        }
+
+                                                        MouseArea {
+                                                            id: wordMouse
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                root.vanishTransitionWord = modelData
+                                                                root.saveVanishConfig("nucleus.transitionWord", modelData)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ── Card 2: Resting Desktop Atom ──────────
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: restingCol.implicitHeight + 28
+                                    radius: 12
+                                    color: Qt.rgba(0, 0, 0, 0.22)
+                                    border.color: Qt.rgba(1, 1, 1, 0.08)
+                                    border.width: 1
+
+                                    ColumnLayout {
+                                        id: restingCol
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 12
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Text {
+                                                text: "RESTING DESKTOP ATOM"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(10)
+                                                font.weight: Font.Bold
+                                                color: Theme.primary
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            Text {
+                                                text: root.vanishShowRestingAtom ? "VISIBLE ON WALLPAPER" : "HIDDEN"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(9)
+                                                color: Qt.rgba(1, 1, 1, 0.45)
+                                            }
+                                        }
+
+                                        // Toggle: Show Resting Atom
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                Text {
+                                                    text: "Show Resting Atom on Desktop"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(11.5)
+                                                    font.weight: Font.Medium
+                                                    color: "#FFFFFF"
+                                                }
+                                                Text {
+                                                    text: "Keep a minimalist 14px carbon atom visible on the wallpaper when all apps are minimized."
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(9.5)
+                                                    color: Qt.rgba(1, 1, 1, 0.45)
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                Layout.preferredWidth: 38
+                                                Layout.preferredHeight: 20
+                                                radius: 10
+                                                color: root.vanishShowRestingAtom ? Theme.primary : Qt.rgba(1, 1, 1, 0.15)
+
+                                                Rectangle {
+                                                    x: root.vanishShowRestingAtom ? parent.width - width - 2 : 2
+                                                    y: 2
+                                                    width: 16
+                                                    height: 16
+                                                    radius: 8
+                                                    color: root.vanishShowRestingAtom ? (Theme.m3onPrimary || "#000000") : "#FFFFFF"
+
+                                                    Behavior on x {
+                                                        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        root.vanishShowRestingAtom = !root.vanishShowRestingAtom
+                                                        root.saveVanishConfig("nucleus.showRestingAtom", root.vanishShowRestingAtom)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Option Selector: Resting Spin Behavior
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+
+                                            ColumnLayout {
+                                                Layout.preferredWidth: 150
+                                                spacing: 2
+                                                Text {
+                                                    text: "Resting Spin Behavior"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(11.5)
+                                                    font.weight: Font.Medium
+                                                    color: "#FFFFFF"
+                                                }
+                                                Text {
+                                                    text: "When electron rings rotate."
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(9.5)
+                                                    color: Qt.rgba(1, 1, 1, 0.45)
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+
+                                                Repeater {
+                                                    model: [
+                                                        { id: "hover", label: "Hover / Press Only" },
+                                                        { id: "always", label: "Always Spin" },
+                                                        { id: "never", label: "Static (No Spin)" }
+                                                    ]
+                                                    delegate: Rectangle {
+                                                        required property var modelData
+                                                        readonly property bool isSelected: root.vanishRestingSpin === modelData.id
+
+                                                        Layout.fillWidth: true
+                                                        Layout.preferredHeight: 24
+                                                        radius: 6
+                                                        color: isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22) : (spinMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent")
+                                                        border.color: isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.12)
+                                                        border.width: 1
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: modelData.label
+                                                            font.family: Theme.font
+                                                            font.pixelSize: Theme.fontPx(10)
+                                                            font.weight: isSelected ? Font.Bold : Font.Normal
+                                                            color: isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.70)
+                                                        }
+
+                                                        MouseArea {
+                                                            id: spinMouse
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                root.vanishRestingSpin = modelData.id
+                                                                root.saveVanishConfig("nucleus.restingSpin", modelData.id)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ── Card 3: Audio Visualizer & Wallpaper Shader ─
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: visCol.implicitHeight + 28
+                                    radius: 12
+                                    color: Qt.rgba(0, 0, 0, 0.22)
+                                    border.color: Qt.rgba(1, 1, 1, 0.08)
+                                    border.width: 1
+
+                                    ColumnLayout {
+                                        id: visCol
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 12
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Text {
+                                                text: "AUDIO VISUALIZER & WALLPAPER"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(10)
+                                                font.weight: Font.Bold
+                                                color: Theme.primary
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            Text {
+                                                text: "SHADERS & SYNCS"
+                                                font.family: Theme.fontMono
+                                                font.pixelSize: Theme.fontPx(9)
+                                                color: Qt.rgba(1, 1, 1, 0.45)
+                                            }
+                                        }
+
+                                        // Music Visualizer Style
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+
+                                            ColumnLayout {
+                                                Layout.preferredWidth: 150
+                                                spacing: 2
+                                                Text {
+                                                    text: "Music Visualizer Style"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(11.5)
+                                                    font.weight: Font.Medium
+                                                    color: "#FFFFFF"
+                                                }
+                                                Text {
+                                                    text: "Waveform geometry around core."
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(9.5)
+                                                    color: Qt.rgba(1, 1, 1, 0.45)
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+
+                                                Repeater {
+                                                    model: [
+                                                        { id: "liquidHalo", label: "Liquid Halo" },
+                                                        { id: "orbitalWave", label: "Orbital Wave" },
+                                                        { id: "bars", label: "Classic Bars" },
+                                                        { id: "none", label: "Disabled" }
+                                                    ]
+                                                    delegate: Rectangle {
+                                                        required property var modelData
+                                                        readonly property bool isSelected: root.vanishMusicVisualizer === modelData.id
+
+                                                        Layout.fillWidth: true
+                                                        Layout.preferredHeight: 24
+                                                        radius: 6
+                                                        color: isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22) : (visMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent")
+                                                        border.color: isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.12)
+                                                        border.width: 1
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: modelData.label
+                                                            font.family: Theme.font
+                                                            font.pixelSize: Theme.fontPx(10)
+                                                            font.weight: isSelected ? Font.Bold : Font.Normal
+                                                            color: isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.70)
+                                                        }
+
+                                                        MouseArea {
+                                                            id: visMouse
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                root.vanishMusicVisualizer = modelData.id
+                                                                root.saveVanishConfig("musicVisualizer", modelData.id)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Wallpaper Transition Effect
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+
+                                            ColumnLayout {
+                                                Layout.preferredWidth: 150
+                                                spacing: 2
+                                                Text {
+                                                    text: "Wallpaper Transition"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(11.5)
+                                                    font.weight: Font.Medium
+                                                    color: "#FFFFFF"
+                                                }
+                                                Text {
+                                                    text: "Shader on wallpaper switch."
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(9.5)
+                                                    color: Qt.rgba(1, 1, 1, 0.45)
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+
+                                                Repeater {
+                                                    model: [
+                                                        { id: "cinematic", label: "Cinematic" },
+                                                        { id: "fade", label: "Crossfade" },
+                                                        { id: "zoom", label: "Hyper Zoom" },
+                                                        { id: "slide", label: "Smooth Slide" }
+                                                    ]
+                                                    delegate: Rectangle {
+                                                        required property var modelData
+                                                        readonly property bool isSelected: root.vanishWallpaperAnimation === modelData.id
+
+                                                        Layout.fillWidth: true
+                                                        Layout.preferredHeight: 24
+                                                        radius: 6
+                                                        color: isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22) : (wpMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent")
+                                                        border.color: isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.12)
+                                                        border.width: 1
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: modelData.label
+                                                            font.family: Theme.font
+                                                            font.pixelSize: Theme.fontPx(10)
+                                                            font.weight: isSelected ? Font.Bold : Font.Normal
+                                                            color: isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.70)
+                                                        }
+
+                                                        MouseArea {
+                                                            id: wpMouse
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                root.vanishWallpaperAnimation = modelData.id
+                                                                root.saveVanishConfig("wallpaperAnimation", modelData.id)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

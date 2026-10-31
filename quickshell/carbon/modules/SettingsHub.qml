@@ -20,17 +20,17 @@ Item {
         onClicked: root.closeRequested()
     }
 
-    // Main Hub Window (Flat, flush edge-to-edge layout separated by strict 1px hairlines)
+    // Main Hub Window (Full-screen flush edge-to-edge layout separated by strict 1px hairlines)
     Rectangle {
         id: hubWindow
-        anchors.centerIn: parent
-        width: Math.min(parent.width - 32, Math.round(1060 * Theme.shellScale))
-        height: Math.min(parent.height - 32, Math.round(680 * Theme.shellScale))
+        anchors.fill: parent
         color: Theme.surface
-        border.color: Qt.rgba(1, 1, 1, 0.12)
-        border.width: 1
-        radius: Theme.px(12)
+        border.width: 0
+        radius: 0
         clip: true
+        focus: true
+
+        Keys.onEscapePressed: root.closeRequested()
 
         // Stop propagation so clicking inside window doesn't close
         MouseArea {
@@ -107,23 +107,10 @@ Item {
                     Layout.preferredWidth: Theme.px(210)
                     Layout.fillHeight: true
 
-                    // Tactile Textured Background: 45-degree etch lines / dot-matrix
-                    Canvas {
-                        id: sidebarCanvas
+                    // Plain solid background
+                    Rectangle {
                         anchors.fill: parent
-                        opacity: 0.03
-                        onPaint: {
-                            var ctx = getContext("2d")
-                            ctx.strokeStyle = "#FFFFFF"
-                            ctx.lineWidth = 1
-                            var step = 6
-                            for (var x = -height; x < width; x += step) {
-                                ctx.beginPath()
-                                ctx.moveTo(x, 0)
-                                ctx.lineTo(x + height, height)
-                                ctx.stroke()
-                            }
-                        }
+                        color: "transparent"
                     }
 
                     // Sidebar Navigation Items
