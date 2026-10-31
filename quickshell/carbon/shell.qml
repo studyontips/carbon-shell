@@ -2438,7 +2438,7 @@ ShellRoot {
 
     /* Edge Reservation */
     readonly property bool hasTopReserve: false
-    readonly property bool hasBottomReserve: (root.barMode === "atomic" || root.barMode === "shard" || root.barMode === "bloom" || root.barMode === "nucleus" || root.barMode === "minimal" || root.barMode === "minimal_notch") ? false :
+    readonly property bool hasBottomReserve: (root.barMode === "notch" || root.barMode === "atomic" || root.barMode === "shard" || root.barMode === "bloom" || root.barMode === "nucleus" || root.barMode === "minimal" || root.barMode === "minimal_notch") ? false :
         (root.barMode === "pill" ? (root.mainBarEdge === "bottom") : (root.mainBarEdge === "bottom" || root.musicBarEdge === "bottom"))
     readonly property bool hasLeftReserve: false
     readonly property bool hasRightReserve: false
@@ -3186,8 +3186,7 @@ ShellRoot {
                 height: root.notchHeight
                 implicitHeight: root.notchHeight
                 attachedBottom: root.mainBarEdge === "bottom"
-                anchors.top: root.mainBarEdge !== "bottom" ? parent.top : undefined
-                anchors.bottom: root.mainBarEdge === "bottom" ? parent.bottom : undefined
+                y: root.mainBarEdge === "bottom" ? (notchBarWindow.height - height) : 0
                 anchors.left: parent.left
                 leftFillet: false
                 rightFillet: true
@@ -3210,8 +3209,7 @@ ShellRoot {
                 hasAttachedPopup: (root.calendarOpen || root.smallMusicOpen) && !root.centerDashboardOpen
                 height: isExpanded ? 270 : root.notchHeight
                 implicitHeight: isExpanded ? 270 : root.notchHeight
-                anchors.top: root.mainBarEdge !== "bottom" ? parent.top : undefined
-                anchors.bottom: root.mainBarEdge === "bottom" ? parent.bottom : undefined
+                y: root.mainBarEdge === "bottom" ? (notchBarWindow.height - height) : 0
                 anchors.horizontalCenter: parent.horizontalCenter
                 leftFillet: true
                 rightFillet: true
@@ -3232,8 +3230,7 @@ ShellRoot {
                 implicitHeight: root.notchHeight
                 attachedBottom: root.mainBarEdge === "bottom"
                 hasAttachedPopup: false
-                anchors.top: root.mainBarEdge !== "bottom" ? parent.top : undefined
-                anchors.bottom: root.mainBarEdge === "bottom" ? parent.bottom : undefined
+                y: root.mainBarEdge === "bottom" ? (notchBarWindow.height - height) : 0
                 anchors.right: parent.right
                 leftFillet: true
                 rightFillet: false

@@ -49,14 +49,13 @@ Item {
     property string notchDockPosition: "top" // "top" | "bottom"
     property bool isDraggingNotch: false
     readonly property real currentBarHeight: root.centerExpanded ? 240 : root.previewNotchHeight
-    readonly property real notchMaxY: Math.max(0, (blueprintCard ? blueprintCard.height : 232) - currentBarHeight)
+    readonly property real notchMaxY: Math.max(0, (blueprintWorkspace ? blueprintWorkspace.height : 230) - currentBarHeight)
 
     Behavior on notchBarsY {
         enabled: !root.isDraggingNotch
         NumberAnimation {
-            duration: 480
-            easing.type: Easing.OutBack
-            easing.overshoot: 1.14
+            duration: 320
+            easing.type: Easing.OutCubic
         }
     }
 
@@ -91,14 +90,55 @@ Item {
         dockToTop()
     }
 
-    function saveBarEdgeConfig(edge) {
+    property string activeSystemMode: "notch"
+
+    function activateMode(modeName) {
+        root.activeSystemMode = modeName
         var script = "import json, os\n" +
             "dir = os.environ.get('CARBON_CONFIG_DIR', os.path.expanduser('~/.config/carbon'))\n" +
             "os.makedirs(dir, exist_ok=True)\n" +
             "p = os.path.join(dir, 'carbon-bar-mode.json')\n" +
             "d = json.load(open(p)) if os.path.exists(p) else {}\n" +
-            "d['mainBarEdge'] = '" + edge + "'\n" +
+            "d['mode'] = '" + modeName + "'\n" +
             "json.dump(d, open(p, 'w'), indent=2)\n"
+        Quickshell.execDetached(["python3", "-c", script])
+    }
+
+    function saveBarEdgeConfig(edge) {
+        var script = "import json, os\n" +
+            "dir = os.environ.get('CARBON_CONFIG_DIR', os.path.expanduser('~/.config/carbon'))\n" +
+            "os.makedirs(dir, exist_ok=True)\n" +
+            "p1 = os.path.join(dir, 'carbon-bar-position.json')\n" +
+            "d1 = json.load(open(p1)) if os.path.exists(p1) else {}\n" +
+            "d1['mainBarEdge'] = '" + edge + "'\n" +
+            "d1['edge'] = '" + edge + "'\n" +
+            "d1['barEdge'] = '" + edge + "'\n" +
+            "d1['musicBarEdge'] = '" + edge + "'\n" +
+            "d1['leftEdge'] = '" + edge + "'\n" +
+            "d1['centerEdge'] = '" + edge + "'\n" +
+            "d1['rightEdge'] = '" + edge + "'\n" +
+            "json.dump(d1, open(p1, 'w'), indent=2)\n" +
+            "p2 = os.path.join(dir, 'carbon-bar-mode.json')\n" +
+            "d2 = json.load(open(p2)) if os.path.exists(p2) else {}\n" +
+            "d2['mainBarEdge'] = '" + edge + "'\n" +
+            "json.dump(d2, open(p2, 'w'), indent=2)\n"
+        Quickshell.execDetached(["python3", "-c", script])
+    }
+
+    // Bottom Bar Configuration Properties
+    property int previewBottomGap: 8
+    property int previewBottomOffset: 0
+    property bool previewBottomExclusiveZone: true
+    property bool previewBottomAutohide: false
+
+    function saveBottomSetting(key, val) {
+        var script = "import json, os\n" +
+            "dir = os.environ.get('CARBON_CONFIG_DIR', os.path.expanduser('~/.config/carbon'))\n" +
+            "os.makedirs(dir, exist_ok=True)\n" +
+            "p1 = os.path.join(dir, 'carbon-bar-position.json')\n" +
+            "d1 = json.load(open(p1)) if os.path.exists(p1) else {}\n" +
+            "d1['" + key + "'] = " + JSON.stringify(val) + "\n" +
+            "json.dump(d1, open(p1, 'w'), indent=2)\n"
         Quickshell.execDetached(["python3", "-c", script])
     }
 
@@ -137,6 +177,7 @@ Item {
             const d = JSON.parse(raw)
             if (d.mode) {
                 var m = String(d.mode).toLowerCase()
+                root.activeSystemMode = m
                 if (m === "notch" || m === "pill") root.currentMode = 0
                 else if (m === "minimal" || m === "minimal_notch") root.currentMode = 1
                 else if (m === "nucleus" || m === "vanish") root.currentMode = 2
@@ -360,10 +401,29 @@ Item {
                             }
                         }
 
-                        // ── Blueprint Screen Workspace (Connected to Card Borders) ──
+                        // ── Rounded Mask for Workspace (Keeps bars cleanly inside card boundary) ──
+                        Item {
+                            id: blueprintMask
+                            anchors.fill: blueprintWorkspace
+                            visible: false
+                            layer.enabled: true
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 13
+                                color: "#FFFFFFFF"
+                            }
+                        }
+
+                        // ── Blueprint Screen Workspace (Connected to Card Borders, 1px Margin) ──
                         Item {
                             id: blueprintWorkspace
                             anchors.fill: parent
+                            anchors.margins: 1
+                            layer.enabled: true
+                            layer.effect: MultiEffect {
+                                maskEnabled: true
+                                maskSource: blueprintMask
+                            }
 
                             // Top Border Snap Flash Effect
                             Rectangle {
@@ -523,12 +583,13 @@ Item {
                                     id: notchUnifiedDragArea
                                     anchors.fill: parent
                                     cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-                                    property real startMouseScreenY: 0
+                                    property real startWorkspaceY: 0
                                     property real startNotchY: 0
                                     property bool movedBeyondThreshold: false
 
                                     onPressed: (mouse) => {
-                                        startMouseScreenY = mouse.y
+                                        var pt = mapToItem(blueprintWorkspace, mouse.x, mouse.y)
+                                        startWorkspaceY = pt.y
                                         startNotchY = root.notchBarsY
                                         movedBeyondThreshold = false
                                         root.isDraggingNotch = true
@@ -536,13 +597,25 @@ Item {
 
                                     onPositionChanged: (mouse) => {
                                         if (!pressed) return
-                                        var delta = mouse.y - startMouseScreenY
-                                        if (Math.abs(delta) > 4) {
+                                        var pt = mapToItem(blueprintWorkspace, mouse.x, mouse.y)
+                                        var delta = pt.y - startWorkspaceY
+                                        if (Math.abs(delta) > 3) {
                                             movedBeyondThreshold = true
                                         }
                                         var newY = startNotchY + delta
                                         var maxY = root.notchMaxY
                                         root.notchBarsY = Math.max(0, Math.min(maxY, newY))
+
+                                        // Realtime edge synchronization when dragging across midpoint
+                                        if (root.notchBarsY > (maxY * 0.5) && root.notchDockPosition !== "bottom") {
+                                            root.notchDockPosition = "bottom"
+                                            root.saveBarEdgeConfig("bottom")
+                                            bottomFlashAnim.restart()
+                                        } else if (root.notchBarsY <= (maxY * 0.5) && root.notchDockPosition !== "top") {
+                                            root.notchDockPosition = "top"
+                                            root.saveBarEdgeConfig("top")
+                                            topFlashAnim.restart()
+                                        }
                                     }
 
                                     onReleased: (mouse) => {
@@ -555,9 +628,9 @@ Item {
                                                 return
                                             }
                                         }
-                                        // Finished dragging: check target docking border
+                                        // Finished dragging: snap target docking border
                                         var maxY = root.notchMaxY
-                                        if (root.notchBarsY > (maxY * 0.45)) {
+                                        if (root.notchBarsY > (maxY * 0.5)) {
                                             root.dockToBottom()
                                         } else {
                                             root.dockToTop()
@@ -569,7 +642,7 @@ Item {
                                 Item {
                                     id: leftBarWrapper
                                     anchors.left: parent.left
-                                    y: 0
+                                    y: root.notchBarsY > (root.notchMaxY * 0.5) ? (parent.height - height) : 0
                                     width: leftNotchBar.width
                                     height: leftNotchBar.height
                                     z: 2
@@ -594,6 +667,7 @@ Item {
                                             width: 22
                                             height: 22
                                             radius: 6
+                                            anchors.verticalCenter: parent.verticalCenter
                                             color: logoBtnMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20) : "transparent"
                                             border.color: logoBtnMouse.containsMouse ? Theme.primary : "transparent"
                                             border.width: 1
@@ -601,7 +675,7 @@ Item {
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: root.selectedLogo
-                                                font.family: "JetBrainsMono Nerd Font"
+                                                font.family: Theme.fontMono
                                                 font.pixelSize: Theme.fontPx(14)
                                                 color: Theme.primary
                                             }
@@ -619,6 +693,7 @@ Item {
                                         Row {
                                             z: 2
                                             spacing: 4
+                                            anchors.verticalCenter: parent.verticalCenter
 
                                             Repeater {
                                                 model: [1, 2, 3, 4]
@@ -629,6 +704,7 @@ Item {
                                                     width: isSelected ? 22 : 16
                                                     height: 18
                                                     radius: 5
+                                                    anchors.verticalCenter: parent.verticalCenter
                                                     color: isSelected ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22) : (wsMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent")
                                                     border.color: isSelected ? Theme.primary : "transparent"
                                                     border.width: 1
@@ -636,7 +712,7 @@ Item {
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: isSelected ? root.selectedActiveGlyph : root.selectedInactiveGlyph
-                                                        font.family: "JetBrainsMono Nerd Font"
+                                                        font.family: Theme.fontMono
                                                         font.pixelSize: Theme.fontPx(10)
                                                         color: isSelected ? Theme.primary : Qt.rgba(1, 1, 1, 0.50)
                                                     }
@@ -658,7 +734,7 @@ Item {
                                 Item {
                                     id: centerBarWrapper
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    y: 0
+                                    y: root.notchBarsY > (root.notchMaxY * 0.5) ? (parent.height - height) : 0
                                     width: centerNotchBar.width
                                     height: centerNotchBar.height
                                     z: root.centerExpanded ? 20 : 3
@@ -683,6 +759,8 @@ Item {
                                         Row {
                                             id: centerBarContent
                                             spacing: 8
+                                            height: parent.height
+                                            anchors.verticalCenter: parent.verticalCenter
                                             visible: !root.centerExpanded
 
                                             // Titan Clock
@@ -860,7 +938,7 @@ Item {
                                 Item {
                                     id: rightBarWrapper
                                     anchors.right: parent.right
-                                    y: 0
+                                    y: root.notchBarsY > (root.notchMaxY * 0.5) ? (parent.height - height) : 0
                                     width: rightNotchBar.width
                                     height: rightNotchBar.height
                                     z: 2
@@ -882,6 +960,8 @@ Item {
                                         Row {
                                             id: rightBarContent
                                             spacing: 8
+                                            height: parent.height
+                                            anchors.verticalCenter: parent.verticalCenter
 
                                             Text {
                                                 text: "󰕾"
@@ -1013,42 +1093,51 @@ Item {
 
                         Item { Layout.fillWidth: true }
 
-                        // Interactive Dock Position Switcher Button
+                        // Mode Enable / Disable Toggle Button
                         Rectangle {
+                            readonly property bool isEnabled: root.activeSystemMode === "notch" || root.activeSystemMode === "pill"
                             height: 28
-                            width: dockBtnRow.implicitWidth + 24
+                            width: notchModeToggleRow.implicitWidth + 24
                             radius: 6
-                            color: dockBtnMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) : Qt.rgba(0, 0, 0, 0.25)
-                            border.color: dockBtnMouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.12)
+                            color: isEnabled 
+                                ? (notchModeToggleMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.28) : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18))
+                                : (notchModeToggleMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.25))
+                            border.color: isEnabled ? Theme.primary : (notchModeToggleMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(1, 1, 1, 0.12))
                             border.width: 1
 
                             RowLayout {
-                                id: dockBtnRow
+                                id: notchModeToggleRow
                                 anchors.centerIn: parent
                                 spacing: 6
 
                                 Text {
-                                    text: root.notchDockPosition === "top" ? "󰘕" : "󰘚"
-                                    font.family: "JetBrainsMono Nerd Font"
+                                    text: parent.parent.isEnabled ? "󰄬" : "󰄱"
+                                    font.family: Theme.fontMono
                                     font.pixelSize: Theme.fontPx(11)
-                                    color: Theme.primary
+                                    color: parent.parent.isEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.50)
                                 }
 
                                 Text {
-                                    text: root.notchDockPosition === "top" ? "Dock to Bottom Bezel" : "Dock to Top Bezel"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontPx(10)
+                                    text: parent.parent.isEnabled ? "Notch Mode Enabled" : "Enable Notch Mode"
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(10.5)
                                     font.weight: Font.DemiBold
-                                    color: Qt.rgba(1, 1, 1, 0.85)
+                                    color: parent.parent.isEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.85)
                                 }
                             }
 
                             MouseArea {
-                                id: dockBtnMouse
+                                id: notchModeToggleMouse
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.toggleNotchDock()
+                                onClicked: {
+                                    if (parent.isEnabled) {
+                                        root.activateMode("nucleus")
+                                    } else {
+                                        root.activateMode("notch")
+                                    }
+                                }
                             }
                         }
                     }
@@ -1081,6 +1170,63 @@ Item {
                                 Layout.fillWidth: true
                                 visible: root.activeSubSection === "Designs"
                                 spacing: 14
+
+                                // ── Bottom Bar Active Quick Banner ───────────
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 38
+                                    radius: 8
+                                    color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.12)
+                                    border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
+                                    border.width: 1
+                                    visible: root.notchDockPosition === "bottom"
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 12
+                                        anchors.rightMargin: 12
+                                        spacing: 10
+
+                                        Text {
+                                            text: "󰘕"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontPx(14)
+                                            color: Theme.primary
+                                        }
+
+                                        Text {
+                                            text: "Bottom Notch Bar Active — Bezel-docked geometry engaged."
+                                            font.family: Theme.font
+                                            font.pixelSize: Theme.fontPx(11)
+                                            font.weight: Font.Medium
+                                            color: Qt.rgba(1, 1, 1, 0.90)
+                                        }
+
+                                        Item { Layout.fillWidth: true }
+
+                                        Rectangle {
+                                            Layout.preferredHeight: 24
+                                            Layout.preferredWidth: 154
+                                            radius: 5
+                                            color: Theme.primary
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "Configure Bottom Bar 󰄾"
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(10)
+                                                font.weight: Font.Bold
+                                                color: Theme.m3onPrimary || "#000000"
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: root.activeSubSection = "Settings"
+                                            }
+                                        }
+                                    }
+                                }
 
                                 // ── 1. Animated Center Clock Customizer ────
                                 Rectangle {
@@ -1481,6 +1627,284 @@ Item {
                                 visible: root.activeSubSection === "Settings"
                                 spacing: 14
 
+                                // ── Top Bezel Status Card ──
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 48
+                                    radius: 10
+                                    color: Qt.rgba(0, 0, 0, 0.22)
+                                    border.color: Qt.rgba(1, 1, 1, 0.08)
+                                    border.width: 1
+                                    visible: root.notchDockPosition === "top"
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 14
+                                        anchors.rightMargin: 14
+                                        spacing: 10
+
+                                        Text {
+                                            text: "󰘚"
+                                            font.family: Theme.fontMono
+                                            font.pixelSize: Theme.fontPx(14)
+                                            color: Theme.primary
+                                        }
+
+                                        ColumnLayout {
+                                            spacing: 1
+                                            Text {
+                                                text: "Top Bezel Dock Active"
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(11.5)
+                                                font.weight: Font.Bold
+                                                color: Qt.rgba(1, 1, 1, 0.90)
+                                            }
+                                            Text {
+                                                text: "Drag the blueprint bar downward to dock to bottom and reveal bottom bar controls."
+                                                font.family: Theme.font
+                                                font.pixelSize: Theme.fontPx(9.5)
+                                                color: Qt.rgba(1, 1, 1, 0.45)
+                                            }
+                                        }
+
+                                        Item { Layout.fillWidth: true }
+
+                                        Rectangle {
+                                            Layout.preferredHeight: 24
+                                            Layout.preferredWidth: 130
+                                            radius: 5
+                                            color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15)
+                                            border.color: Theme.primary
+                                            border.width: 1
+
+                                            RowLayout {
+                                                anchors.centerIn: parent
+                                                spacing: 4
+                                                Text {
+                                                    text: "󰘕"
+                                                    font.family: Theme.fontMono
+                                                    font.pixelSize: Theme.fontPx(10)
+                                                    color: Theme.primary
+                                                }
+                                                Text {
+                                                    text: "Dock to Bottom"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(9.5)
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.primary
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: root.dockToBottom()
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ── Dedicated Bottom Bar Configuration Card ──
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: bottomBarCol.implicitHeight + 28
+                                    radius: 12
+                                    color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08)
+                                    border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
+                                    border.width: 1
+                                    visible: root.notchDockPosition === "bottom"
+
+                                    ColumnLayout {
+                                        id: bottomBarCol
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 12
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+
+                                            ColumnLayout {
+                                                spacing: 2
+                                                Text {
+                                                    text: "󰘕  Bottom Bar Configuration & Bezel Dynamics"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(13)
+                                                    font.weight: Font.Bold
+                                                    color: Theme.primary
+                                                }
+                                                Text {
+                                                    text: "Settings tailored for when notch bars are docked to the bottom of the screen."
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(10.5)
+                                                    color: Qt.rgba(1, 1, 1, 0.60)
+                                                }
+                                            }
+
+                                            Item { Layout.fillWidth: true }
+
+                                            Rectangle {
+                                                Layout.preferredHeight: 24
+                                                Layout.preferredWidth: 124
+                                                radius: 5
+                                                color: Qt.rgba(1, 1, 1, 0.08)
+                                                border.color: Qt.rgba(1, 1, 1, 0.15)
+                                                border.width: 1
+
+                                                RowLayout {
+                                                    anchors.centerIn: parent
+                                                    spacing: 4
+                                                    Text {
+                                                        text: "󰘚"
+                                                        font.family: Theme.fontMono
+                                                        font.pixelSize: Theme.fontPx(10)
+                                                        color: Theme.primary
+                                                    }
+                                                    Text {
+                                                        text: "Dock to Top"
+                                                        font.family: Theme.font
+                                                        font.pixelSize: Theme.fontPx(9.5)
+                                                        color: Qt.rgba(1, 1, 1, 0.85)
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: root.dockToTop()
+                                                }
+                                            }
+                                        }
+
+                                        RazorWireSlider {
+                                            Layout.fillWidth: true
+                                            label: "Bottom Window Clearance / App Gap"
+                                            from: 0
+                                            to: 32
+                                            value: root.previewBottomGap
+                                            unit: "px"
+                                            onMoved: function(v) {
+                                                root.previewBottomGap = Math.round(v)
+                                                root.saveBottomSetting("notchAppGap", Math.round(v))
+                                            }
+                                        }
+
+                                        RazorWireSlider {
+                                            Layout.fillWidth: true
+                                            label: "Bottom Edge Lift / Offset"
+                                            from: 0
+                                            to: 20
+                                            value: root.previewBottomOffset
+                                            unit: "px"
+                                            onMoved: function(v) {
+                                                root.previewBottomOffset = Math.round(v)
+                                                root.saveBottomSetting("bottomOffset", Math.round(v))
+                                            }
+                                        }
+
+                                        // Bottom Exclusive Zone Toggle
+                                        RowLayout {
+                                            Layout.fillWidth: true
+
+                                            ColumnLayout {
+                                                spacing: 2
+                                                Text {
+                                                    text: "Reserve Space on Bottom Bezel"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(12)
+                                                    color: Qt.rgba(1, 1, 1, 0.90)
+                                                }
+                                                Text {
+                                                    text: "Pushes tiled and maximized windows upward to prevent overlapping the bottom notch bars."
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(10)
+                                                    color: Qt.rgba(1, 1, 1, 0.45)
+                                                }
+                                            }
+
+                                            Item { Layout.fillWidth: true }
+
+                                            Rectangle {
+                                                Layout.preferredWidth: 44
+                                                Layout.preferredHeight: 24
+                                                radius: 12
+                                                color: root.previewBottomExclusiveZone ? Theme.primary : Qt.rgba(1, 1, 1, 0.15)
+
+                                                Behavior on color { ColorAnimation { duration: 180 } }
+
+                                                Rectangle {
+                                                    width: 18
+                                                    height: 18
+                                                    radius: 9
+                                                    color: root.previewBottomExclusiveZone ? (Theme.m3onPrimary || Theme.bg || "#000000") : (Theme.fg || "#ffffff")
+                                                    x: root.previewBottomExclusiveZone ? 23 : 3
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                                                }
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        root.previewBottomExclusiveZone = !root.previewBottomExclusiveZone
+                                                        root.saveBottomSetting("exclusiveZone", root.previewBottomExclusiveZone)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Smart Bottom Autohide Toggle
+                                        RowLayout {
+                                            Layout.fillWidth: true
+
+                                            ColumnLayout {
+                                                spacing: 2
+                                                Text {
+                                                    text: "Smart Bottom Autohide on Fullscreen"
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(12)
+                                                    color: Qt.rgba(1, 1, 1, 0.90)
+                                                }
+                                                Text {
+                                                    text: "Smoothly tuck the notch bar away when a window is focused in full screen mode."
+                                                    font.family: Theme.font
+                                                    font.pixelSize: Theme.fontPx(10)
+                                                    color: Qt.rgba(1, 1, 1, 0.45)
+                                                }
+                                            }
+
+                                            Item { Layout.fillWidth: true }
+
+                                            Rectangle {
+                                                Layout.preferredWidth: 44
+                                                Layout.preferredHeight: 24
+                                                radius: 12
+                                                color: root.previewBottomAutohide ? Theme.primary : Qt.rgba(1, 1, 1, 0.15)
+
+                                                Behavior on color { ColorAnimation { duration: 180 } }
+
+                                                Rectangle {
+                                                    width: 18
+                                                    height: 18
+                                                    radius: 9
+                                                    color: root.previewBottomAutohide ? (Theme.m3onPrimary || Theme.bg || "#000000") : (Theme.fg || "#ffffff")
+                                                    x: root.previewBottomAutohide ? 23 : 3
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                                                }
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        root.previewBottomAutohide = !root.previewBottomAutohide
+                                                        root.saveBottomSetting("autohide", root.previewBottomAutohide)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 // Notch Geometry Sliders Card
                                 Rectangle {
                                     Layout.fillWidth: true
@@ -1653,37 +2077,124 @@ Item {
             }
 
             // ---------------------------------------------------------------
-            // MODE 1: MINIMAL ISLAND (Placeholder for Next Iteration)
+            // ---------------------------------------------------------------
+            // MODE 1: MINIMAL ISLAND (Compact Floating Dynamic Pill)
             // ---------------------------------------------------------------
             ColumnLayout {
-                anchors.centerIn: parent
+                anchors.fill: parent
                 visible: root.currentMode === 1
-                spacing: 12
+                spacing: 0
 
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "󰝥"
-                    font.family: Theme.fontMono
-                    font.pixelSize: Theme.fontPx(36)
-                    color: Theme.primary
+                // Sub-header Row with Mode Enable/Disable Toggle
+                Item {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 44
+                    Layout.leftMargin: 16
+                    Layout.rightMargin: 16
+
+                    RowLayout {
+                        anchors.fill: parent
+
+                        Text {
+                            text: "MINIMAL ISLAND // COMPACT DYNAMIC PILL"
+                            font.family: Theme.fontMono
+                            font.pixelSize: Theme.fontPx(9.5)
+                            font.weight: Font.Bold
+                            color: Qt.rgba(1, 1, 1, 0.45)
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        // Mode Enable / Disable Toggle Button
+                        Rectangle {
+                            readonly property bool isEnabled: root.activeSystemMode === "minimal" || root.activeSystemMode === "minimal_notch"
+                            height: 28
+                            width: minToggleRow.implicitWidth + 24
+                            radius: 6
+                            color: isEnabled 
+                                ? (minToggleMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.28) : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18))
+                                : (minToggleMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.25))
+                            border.color: isEnabled ? Theme.primary : (minToggleMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(1, 1, 1, 0.12))
+                            border.width: 1
+
+                            RowLayout {
+                                id: minToggleRow
+                                anchors.centerIn: parent
+                                spacing: 6
+
+                                Text {
+                                    text: parent.parent.isEnabled ? "󰄬" : "󰄱"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontPx(11)
+                                    color: parent.parent.isEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.50)
+                                }
+
+                                Text {
+                                    text: parent.parent.isEnabled ? "Minimal Island Enabled" : "Enable Minimal Island"
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(10.5)
+                                    font.weight: Font.DemiBold
+                                    color: parent.parent.isEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.85)
+                                }
+                            }
+
+                            MouseArea {
+                                id: minToggleMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (parent.isEnabled) {
+                                        root.activateMode("notch")
+                                    } else {
+                                        root.activateMode("minimal")
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "MINIMAL ISLAND MODE"
-                    font.family: Theme.font
-                    font.pixelSize: Theme.fontPx(16)
-                    font.weight: Font.Bold
-                    color: Qt.rgba(1, 1, 1, 0.95)
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Qt.rgba(1, 1, 1, 0.08)
                 }
 
-                Text {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "Ultra-compact single pill bar with floating dynamic island expansions.\nCustomizer modules for Minimal Island will be configured here."
-                    font.family: Theme.font
-                    font.pixelSize: Theme.fontPx(11.5)
-                    color: Qt.rgba(1, 1, 1, 0.50)
-                    horizontalAlignment: Text.AlignHCenter
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 12
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "󰝥"
+                            font.family: Theme.fontMono
+                            font.pixelSize: Theme.fontPx(36)
+                            color: Theme.primary
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "MINIMAL ISLAND MODE"
+                            font.family: Theme.font
+                            font.pixelSize: Theme.fontPx(16)
+                            font.weight: Font.Bold
+                            color: Qt.rgba(1, 1, 1, 0.95)
+                        }
+
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "Ultra-compact single pill bar with floating dynamic island expansions.\nClick the button above to enable this mode on your desktop."
+                            font.family: Theme.font
+                            font.pixelSize: Theme.fontPx(11.5)
+                            color: Qt.rgba(1, 1, 1, 0.50)
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
                 }
             }
 
@@ -2362,7 +2873,7 @@ Item {
                         // Quick Toggle Media Preview Button in sub-header
                         Rectangle {
                             height: 28
-                            width: vanishPreviewBtnText.implicitWidth + 24
+                            width: vanishPreviewBtnText.implicitWidth + 20
                             radius: 6
                             color: vanishPreviewBtnMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.20)
                             border.color: vanishPreviewBtnMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(1, 1, 1, 0.10)
@@ -2371,7 +2882,7 @@ Item {
                             Text {
                                 id: vanishPreviewBtnText
                                 anchors.centerIn: parent
-                                text: root.vanishMediaPlaying ? "󰝛  Hide Media View" : "󰝚  Show Media View"
+                                text: root.vanishMediaPlaying ? "󰝛  Hide Media" : "󰝚  Show Media"
                                 font.family: Theme.fontMono
                                 font.pixelSize: Theme.fontPx(10)
                                 color: Qt.rgba(1, 1, 1, 0.75)
@@ -2382,6 +2893,54 @@ Item {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: root.vanishMediaPlaying = !root.vanishMediaPlaying
+                            }
+                        }
+
+                        // Mode Enable / Disable Toggle Button
+                        Rectangle {
+                            readonly property bool isEnabled: root.activeSystemMode === "nucleus" || root.activeSystemMode === "vanish"
+                            height: 28
+                            width: vanishToggleRow.implicitWidth + 24
+                            radius: 6
+                            color: isEnabled 
+                                ? (vanishToggleMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.28) : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18))
+                                : (vanishToggleMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.25))
+                            border.color: isEnabled ? Theme.primary : (vanishToggleMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(1, 1, 1, 0.12))
+                            border.width: 1
+
+                            RowLayout {
+                                id: vanishToggleRow
+                                anchors.centerIn: parent
+                                spacing: 6
+
+                                Text {
+                                    text: parent.parent.isEnabled ? "󰄬" : "󰄱"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontPx(11)
+                                    color: parent.parent.isEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.50)
+                                }
+
+                                Text {
+                                    text: parent.parent.isEnabled ? "Vanish Mode Enabled" : "Enable Vanish Mode"
+                                    font.family: Theme.font
+                                    font.pixelSize: Theme.fontPx(10.5)
+                                    font.weight: Font.DemiBold
+                                    color: parent.parent.isEnabled ? Theme.primary : Qt.rgba(1, 1, 1, 0.85)
+                                }
+                            }
+
+                            MouseArea {
+                                id: vanishToggleMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (parent.isEnabled) {
+                                        root.activateMode("notch")
+                                    } else {
+                                        root.activateMode("nucleus")
+                                    }
+                                }
                             }
                         }
                     }

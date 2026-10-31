@@ -68,10 +68,7 @@ Item {
             anchors.leftMargin: (!root.leftFillet && root.rightFillet) ? -root.bottomRadius : 0
             anchors.right: parent.right
             anchors.rightMargin: (!root.rightFillet && root.leftFillet) ? -root.bottomRadius : 0
-            anchors.top: root.attachedBottom ? undefined : parent.top
-            anchors.topMargin: root.attachedBottom ? 0 : -root.bottomRadius
-            anchors.bottom: root.attachedBottom ? parent.bottom : undefined
-            anchors.bottomMargin: root.attachedBottom ? -root.bottomRadius : 0
+            y: root.attachedBottom ? 0 : -root.bottomRadius
             height: parent.height + root.bottomRadius
             radius: root.bottomRadius
             color: root.notchBgColor
@@ -153,10 +150,10 @@ Item {
     Row {
         id: contentRow
         z: 1
-        anchors.top: root.attachedBottom ? undefined : parent.top
-        anchors.topMargin: root.attachedBottom ? undefined : Math.max(0, (Math.min(root.height, 32) - contentRow.height) / 2)
-        anchors.bottom: root.attachedBottom ? parent.bottom : undefined
-        anchors.bottomMargin: root.attachedBottom ? Math.max(0, (Math.min(root.height, 32) - contentRow.height) / 2) : undefined
+        height: root.hasAttachedPopup ? root.implicitHeight : root.height
+        anchors.verticalCenter: root.hasAttachedPopup ? undefined : parent.verticalCenter
+        anchors.top: root.hasAttachedPopup && !root.attachedBottom ? parent.top : undefined
+        anchors.bottom: root.hasAttachedPopup && root.attachedBottom ? parent.bottom : undefined
         anchors.left: (!root.rightFillet && root.leftFillet) ? undefined : ((root.leftFillet && root.rightFillet) ? undefined : parent.left)
         anchors.leftMargin: (!root.rightFillet && root.leftFillet) ? undefined : ((root.leftFillet && root.rightFillet) ? undefined : ((root.leftFillet ? root.filletRadius : 0) + root.horizontalPadding))
         anchors.right: (!root.rightFillet && root.leftFillet) ? parent.right : undefined
