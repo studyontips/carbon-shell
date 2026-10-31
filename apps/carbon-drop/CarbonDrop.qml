@@ -28,7 +28,15 @@ FloatingWindow {
     property bool dropdownOpen: false
     property bool isCopied: false
 
-    readonly property string enginePath: "/home/shogun/carbon-shell/apps/carbon-drop/target/release/carbon-drop-engine"
+    readonly property string homeDir: Quickshell.env("HOME") || ""
+    readonly property string enginePath: {
+        let envPath = Quickshell.env("CARBON_DROP_ENGINE");
+        if (envPath && envPath.length > 0) return envPath;
+        if (homeDir.length > 0) {
+            return homeDir + "/.local/bin/carbon-drop-engine";
+        }
+        return "carbon-drop-engine";
+    }
 
     readonly property var hosts: [
         { id: "Buzzheavier", label: "Buzzheavier (10GB+)", desc: "10GB+ heavy transfers • Direct streaming" },
