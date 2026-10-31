@@ -320,54 +320,11 @@ async fn upload_file(
     Ok(final_url)
 }
 
-fn urlencode(s: &str) -> String {
-    let mut result = String::new();
-    for b in s.bytes() {
-        if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~' {
-            result.push(b as char);
-        } else {
-            result.push_str(&format!("%{:02X}", b));
-        }
-    }
-    result
-}
-
-async fn upload_to_gofile(file_path: &str) -> Result<String, String> {
-    let mut cmd = tokio::process::Command::new("curl");
-    cmd.arg("-sS")
-       .arg("--connect-timeout").arg("15")
-       .arg("--max-time").arg("7200")
-       .arg("-F").arg(format!("file=@{}", file_path))
-       .arg("https://upload.gofile.io/uploadfile");
-
-    let output = cmd.output().await.map_err(|e| format!("Error executing curl: {}", e))?;
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-
-    if !output.status.success() || stdout.is_empty() {
-        return Err(format!("Error: {}", if stderr.is_empty() { "Gofile upload failed" } else { &stderr }));
-    }
-
-    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
-        if let Some(link) = json["data"]["downloadPage"].as_str() {
-            return Ok(link.to_string());
-        }
-    }
-
-    if stdout.starts_with("http://") || stdout.starts_with("https://") {
-        Ok(stdout)
-    } else {
-        Err(format!("Error parsing Gofile response: {}", stdout))
-    }
-}
-
 async fn upload_to_buzzheavier(file_path: &str) -> Result<String, String> {
     let file_name = std::path::Path::new(file_path)
-        .file_name()
-        .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or_else(|| "upload.bin".to_string());
-    let encoded_name = urlencode(&file_name);
-    let target_url = format!("https://w.buzzheavier.com/{}", encoded_name);
+        .file_name().unwrap_or_default().to_string_lossy().to_string();
+    let safe_name = file_name.replace(' ', "_");
+    let target_url = format!("https://w.buzzheavier.com/{}", safe_name);
 
     let mut cmd = tokio::process::Command::new("curl");
     cmd.arg("-sS")
@@ -402,42 +359,26 @@ async fn upload_to_buzzheavier(file_path: &str) -> Result<String, String> {
     }
 }
 
-async fn upload_to_bashupload(file_path: &str) -> Result<String, String> {
-    let file_name = std::path::Path::new(file_path)
-        .file_name()
-        .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or_else(|| "upload.bin".to_string());
-    let encoded_name = urlencode(&file_name);
-    let target_url = format!("https://bashupload.com/{}", encoded_name);
-
+async fn upload_to_tempsh(file_path: &str) -> Result<String, String> {
     let mut cmd = tokio::process::Command::new("curl");
     cmd.arg("-sS")
        .arg("--connect-timeout").arg("15")
        .arg("--max-time").arg("7200")
-       .arg("-T").arg(file_path)
-       .arg(&target_url);
+       .arg("-F").arg(format!("file=@{}", file_path))
+       .arg("https://temp.sh/upload");
 
     let output = cmd.output().await.map_err(|e| format!("Error executing curl: {}", e))?;
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
     if !output.status.success() || stdout.is_empty() {
-        return Err(format!("Error: {}", if stderr.is_empty() { "Bashupload upload failed" } else { &stderr }));
-    }
-
-    for line in stdout.lines() {
-        let trimmed = line.trim();
-        if let Some(idx) = trimmed.find("https://bashupload.com/") {
-            let url_part = &trimmed[idx..];
-            let link = url_part.split_whitespace().next().unwrap_or(url_part);
-            return Ok(link.to_string());
-        }
+        return Err(format!("Error: {}", if stderr.is_empty() { "temp.sh upload failed" } else { &stderr }));
     }
 
     if stdout.starts_with("http://") || stdout.starts_with("https://") {
         Ok(stdout)
     } else {
-        Err(format!("Error parsing Bashupload response: {}", stdout))
+        Err(format!("Error from temp.sh: {}", stdout))
     }
 }
 
@@ -445,8 +386,8 @@ async fn upload_to_x0(file_path: &str) -> Result<String, String> {
     let mut cmd = tokio::process::Command::new("curl");
     cmd.arg("-sS")
        .arg("--connect-timeout").arg("15")
-       .arg("--max-time").arg("7200")
-       .arg("-A").arg("CarbonDrop/1.0 (Linux)")
+       .arg("--max-time").arg("3600")
+       .arg("-A").arg("CarbonDrop/1.0 (ArchLinux)")
        .arg("-F").arg(format!("file=@{}", file_path))
        .arg("https://x0.at");
 
@@ -465,40 +406,11 @@ async fn upload_to_x0(file_path: &str) -> Result<String, String> {
     }
 }
 
-async fn upload_to_kappa(file_path: &str) -> Result<String, String> {
-    let mut cmd = tokio::process::Command::new("curl");
-    cmd.arg("-sS")
-       .arg("--connect-timeout").arg("15")
-       .arg("--max-time").arg("7200")
-       .arg("-F").arg(format!("file=@{}", file_path))
-       .arg("https://kappa.lol/api/upload");
-
-    let output = cmd.output().await.map_err(|e| format!("Error executing curl: {}", e))?;
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-
-    if !output.status.success() || stdout.is_empty() {
-        return Err(format!("Error: {}", if stderr.is_empty() { "kappa.lol upload failed" } else { &stderr }));
-    }
-
-    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
-        if let Some(link) = json["link"].as_str() {
-            return Ok(link.to_string());
-        }
-    }
-
-    if stdout.starts_with("http://") || stdout.starts_with("https://") {
-        Ok(stdout)
-    } else {
-        Err(format!("Error parsing kappa.lol response: {}", stdout))
-    }
-}
-
 async fn upload_to_uguu(file_path: &str) -> Result<String, String> {
     let mut cmd = tokio::process::Command::new("curl");
     cmd.arg("-sS")
        .arg("--connect-timeout").arg("15")
-       .arg("--max-time").arg("7200")
+       .arg("--max-time").arg("1800")
        .arg("-F").arg(format!("files[]=@{}", file_path))
        .arg("https://uguu.se/upload");
 
@@ -520,6 +432,41 @@ async fn upload_to_uguu(file_path: &str) -> Result<String, String> {
         Ok(stdout)
     } else {
         Err(format!("Error parsing response: {}", stdout))
+    }
+}
+
+async fn upload_to_kappa(file_path: &str) -> Result<String, String> {
+    let mut cmd = tokio::process::Command::new("curl");
+    cmd.arg("-sS")
+       .arg("--connect-timeout").arg("15")
+       .arg("--max-time").arg("1800")
+       .arg("-F").arg(format!("file=@{}", file_path))
+       .arg("https://kappa.lol/api/upload");
+
+    let output = cmd.output().await.map_err(|e| format!("Error executing curl: {}", e))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+    if !output.status.success() || stdout.is_empty() {
+        return Err(format!("Error: {}", if stderr.is_empty() { "kappa.lol upload failed" } else { &stderr }));
+    }
+
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
+        if let Some(link) = json["link"].as_str() {
+            let mut final_link = link.to_string();
+            if let Some(ext) = json["ext"].as_str() {
+                if !ext.is_empty() && !final_link.ends_with(ext) {
+                    final_link.push_str(ext);
+                }
+            }
+            return Ok(final_link);
+        }
+    }
+
+    if stdout.starts_with("http://") || stdout.starts_with("https://") {
+        Ok(stdout)
+    } else {
+        Err(format!("Error parsing kappa.lol response: {}", stdout))
     }
 }
 
@@ -553,26 +500,23 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
 
     let task = tokio::spawn(async move {
         let final_url: String = match active_api_string.as_str() {
-            "Gofile.io" => {
-                upload_to_gofile(&file_path).await.unwrap_or_else(|e| e)
-            }
             "Buzzheavier" => {
                 upload_to_buzzheavier(&file_path).await.unwrap_or_else(|e| e)
             }
-            "Bashupload" => {
-                upload_to_bashupload(&file_path).await.unwrap_or_else(|e| e)
+            "temp.sh" => {
+                upload_to_tempsh(&file_path).await.unwrap_or_else(|e| e)
             }
             "x0.at" | "0x0.st" => {
                 upload_to_x0(&file_path).await.unwrap_or_else(|e| e)
             }
-            "kappa.lol" | "Litterbox" => {
-                upload_to_kappa(&file_path).await.unwrap_or_else(|e| e)
-            }
             "uguu.se" => {
                 upload_to_uguu(&file_path).await.unwrap_or_else(|e| e)
             }
+            "kappa.lol" | "Litterbox" => {
+                upload_to_kappa(&file_path).await.unwrap_or_else(|e| e)
+            }
             _ => {
-                upload_to_gofile(&file_path).await.unwrap_or_else(|e| e)
+                upload_to_buzzheavier(&file_path).await.unwrap_or_else(|e| e)
             }
         };
 
@@ -710,11 +654,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ui.on_select_api(move |api_name| {
         if let Some(ui) = ui_weak.upgrade() {
             let cap = match api_name.as_str() {
-                "Gofile.io" => "10GB+",
                 "Buzzheavier" => "10GB+",
-                "Bashupload" => "25GB",
-                "x0.at" => "1GB",
-                "kappa.lol" => "100MB",
+                "temp.sh" => "4GB Raw",
+                "x0.at" => "1GB Raw",
+                "uguu.se" => "128MB Embed",
+                "kappa.lol" => "100MB Perm",
                 _ => "10GB+",
             };
             ui.set_active_api(api_name);
@@ -886,11 +830,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(api) = api_arg {
         let cap = match api.as_str() {
-            "Gofile.io" => "10GB+",
             "Buzzheavier" => "10GB+",
-            "Bashupload" => "25GB",
-            "x0.at" => "1GB",
-            "kappa.lol" => "100MB",
+            "temp.sh" => "4GB Raw",
+            "x0.at" => "1GB Raw",
+            "uguu.se" => "128MB Embed",
+            "kappa.lol" => "100MB Perm",
             _ => "10GB+",
         };
         ui.set_active_api(api.into());

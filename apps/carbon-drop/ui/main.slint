@@ -15,7 +15,7 @@ export component MainWindow inherits Window {
     in-out property <AppState> state: AppState.Idle;
     in-out property <int> app_state: 0;
     in-out property <bool> dropdown_open: false;
-    in-out property <string> active_api: "Gofile.io";
+    in-out property <string> active_api: "Buzzheavier";
     in-out property <string> active_capacity: "10GB+";
     in-out property <float> upload_progress: 0.0;
     in-out property <string> file_name: "";
@@ -309,7 +309,7 @@ export component MainWindow inherits Window {
                 HorizontalLayout {
                     alignment: center;
                     dropdown_box := Rectangle {
-                        width: 210px;
+                        width: 230px;
                         height: 34px;
                         border-radius: 8px;
                         background: dropdown_touch.has-hover ? #181b24 : #12141a;
@@ -529,9 +529,9 @@ export component MainWindow inherits Window {
         // Floating Dropdown Menu Card (floats above control deck)
         Rectangle {
             visible: root.dropdown_open;
-            x: 215px;
+            x: 205px;
             y: 192px;
-            width: 210px;
+            width: 230px;
             height: 178px;
             border-radius: 8px;
             background: #14171f;
@@ -543,40 +543,7 @@ export component MainWindow inherits Window {
                 padding: 4px;
                 spacing: 2px;
 
-                // Option 1: Gofile.io
-                Rectangle {
-                    height: 32px;
-                    border-radius: 6px;
-                    background: opt_gofile_touch.has-hover ? #00f0ff1a : (root.active_api == "Gofile.io" ? #00f0ff10 : transparent);
-                    opt_gofile_touch := TouchArea {
-                        clicked => {
-                            root.active_api = "Gofile.io";
-                            root.active_capacity = "10GB+";
-                            root.select_api("Gofile.io");
-                            root.dropdown_open = false;
-                        }
-                    }
-                    HorizontalLayout {
-                        padding-left: 10px;
-                        padding-right: 10px;
-                        alignment: space-between;
-                        Text {
-                            text: (root.active_api == "Gofile.io" ? "◆ " : "  ") + "Gofile.io";
-                            color: root.active_api == "Gofile.io" ? #00f0ff : (opt_gofile_touch.has-hover ? #ffffff : #ffffffcc);
-                            font-size: 12px;
-                            font-weight: root.active_api == "Gofile.io" ? 600 : 400;
-                            vertical-alignment: center;
-                        }
-                        Text {
-                            text: "10GB+";
-                            color: root.active_api == "Gofile.io" ? #00f0ffaa : #ffffff66;
-                            font-size: 11px;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
-
-                // Option 2: Buzzheavier
+                // Option 1: Buzzheavier
                 Rectangle {
                     height: 32px;
                     border-radius: 6px;
@@ -609,16 +576,16 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                // Option 3: Bashupload
+                // Option 2: temp.sh
                 Rectangle {
                     height: 32px;
                     border-radius: 6px;
-                    background: opt_bash_touch.has-hover ? #00f0ff1a : (root.active_api == "Bashupload" ? #00f0ff10 : transparent);
-                    opt_bash_touch := TouchArea {
+                    background: opt_temp_touch.has-hover ? #00f0ff1a : (root.active_api == "temp.sh" ? #00f0ff10 : transparent);
+                    opt_temp_touch := TouchArea {
                         clicked => {
-                            root.active_api = "Bashupload";
-                            root.active_capacity = "25GB";
-                            root.select_api("Bashupload");
+                            root.active_api = "temp.sh";
+                            root.active_capacity = "4GB Raw";
+                            root.select_api("temp.sh");
                             root.dropdown_open = false;
                         }
                     }
@@ -627,22 +594,22 @@ export component MainWindow inherits Window {
                         padding-right: 10px;
                         alignment: space-between;
                         Text {
-                            text: (root.active_api == "Bashupload" ? "◆ " : "  ") + "Bashupload";
-                            color: root.active_api == "Bashupload" ? #00f0ff : (opt_bash_touch.has-hover ? #ffffff : #ffffffcc);
+                            text: (root.active_api == "temp.sh" ? "◆ " : "  ") + "temp.sh";
+                            color: root.active_api == "temp.sh" ? #00f0ff : (opt_temp_touch.has-hover ? #ffffff : #ffffffcc);
                             font-size: 12px;
-                            font-weight: root.active_api == "Bashupload" ? 600 : 400;
+                            font-weight: root.active_api == "temp.sh" ? 600 : 400;
                             vertical-alignment: center;
                         }
                         Text {
-                            text: "25GB";
-                            color: root.active_api == "Bashupload" ? #00f0ffaa : #ffffff66;
+                            text: "4GB Raw";
+                            color: root.active_api == "temp.sh" ? #00f0ffaa : #ffffff66;
                             font-size: 11px;
                             vertical-alignment: center;
                         }
                     }
                 }
 
-                // Option 4: x0.at
+                // Option 3: x0.at
                 Rectangle {
                     height: 32px;
                     border-radius: 6px;
@@ -650,7 +617,7 @@ export component MainWindow inherits Window {
                     opt_x0_touch := TouchArea {
                         clicked => {
                             root.active_api = "x0.at";
-                            root.active_capacity = "1GB";
+                            root.active_capacity = "1GB Raw";
                             root.select_api("x0.at");
                             root.dropdown_open = false;
                         }
@@ -667,8 +634,41 @@ export component MainWindow inherits Window {
                             vertical-alignment: center;
                         }
                         Text {
-                            text: "1GB";
+                            text: "1GB Raw";
                             color: root.active_api == "x0.at" ? #00f0ffaa : #ffffff66;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Option 4: uguu.se
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: opt_uguu_touch.has-hover ? #00f0ff1a : (root.active_api == "uguu.se" ? #00f0ff10 : transparent);
+                    opt_uguu_touch := TouchArea {
+                        clicked => {
+                            root.active_api = "uguu.se";
+                            root.active_capacity = "128MB Embed";
+                            root.select_api("uguu.se");
+                            root.dropdown_open = false;
+                        }
+                    }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: space-between;
+                        Text {
+                            text: (root.active_api == "uguu.se" ? "◆ " : "  ") + "uguu.se";
+                            color: root.active_api == "uguu.se" ? #00f0ff : (opt_uguu_touch.has-hover ? #ffffff : #ffffffcc);
+                            font-size: 12px;
+                            font-weight: root.active_api == "uguu.se" ? 600 : 400;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "128MB Embed";
+                            color: root.active_api == "uguu.se" ? #00f0ffaa : #ffffff66;
                             font-size: 11px;
                             vertical-alignment: center;
                         }
@@ -683,7 +683,7 @@ export component MainWindow inherits Window {
                     opt_kappa_touch := TouchArea {
                         clicked => {
                             root.active_api = "kappa.lol";
-                            root.active_capacity = "100MB";
+                            root.active_capacity = "100MB Perm";
                             root.select_api("kappa.lol");
                             root.dropdown_open = false;
                         }
@@ -700,7 +700,7 @@ export component MainWindow inherits Window {
                             vertical-alignment: center;
                         }
                         Text {
-                            text: "100MB";
+                            text: "100MB Perm";
                             color: root.active_api == "kappa.lol" ? #00f0ffaa : #ffffff66;
                             font-size: 11px;
                             vertical-alignment: center;
