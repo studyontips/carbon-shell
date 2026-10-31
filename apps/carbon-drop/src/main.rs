@@ -13,6 +13,56 @@ use tokio::task::JoinHandle;
 
 slint::include_modules!();
 
+pub type AppWindow = MainWindow;
+
+pub mod slint_compat {
+    use std::path::{Path, PathBuf};
+
+    pub struct DroppedFile {
+        pub path: PathBuf,
+    }
+
+    impl DroppedFile {
+        pub fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    pub struct DropEvent {
+        pub files: Vec<DroppedFile>,
+    }
+
+    pub enum WindowEvent {
+        Drop(DropEvent),
+        Hover,
+    }
+}
+
+pub trait SlintWindowDropExt {
+    fn on_window_event(&self, f: impl FnMut(slint_compat::WindowEvent) + 'static);
+}
+
+impl SlintWindowDropExt for ::slint::Window {
+    fn on_window_event(&self, mut f: impl FnMut(slint_compat::WindowEvent) + 'static) {
+        self.on_winit_window_event(move |_window, event| {
+            if let winit::event::WindowEvent::DroppedFile(path) = event {
+                let drop_event = slint_compat::DropEvent {
+                    files: vec![slint_compat::DroppedFile { path: path.clone() }],
+                };
+                f(slint_compat::WindowEvent::Drop(drop_event));
+            }
+            EventResult::Propagate
+        });
+    }
+}
+
+mod slint_mod {
+    pub use ::slint::*;
+    pub use crate::slint_compat::WindowEvent;
+}
+use slint_mod as slint;
+
+
 /// Helper to generate SVG Arc Path commands for circular progress
 fn calculate_arc_path(progress: f32) -> String {
     let p = progress.clamp(0.0, 1.0);
@@ -30,6 +80,7 @@ fn calculate_arc_path(progress: f32) -> String {
 }
 
 /// Custom AsyncRead wrapper to track upload progress and support pause
+#[allow(dead_code)]
 struct ProgressReader<R> {
     inner: R,
     uploaded: Arc<AtomicU64>,
@@ -104,6 +155,7 @@ impl AppController {
 }
 
 /// Dispatches an async streaming upload to the chosen API
+#[allow(dead_code)]
 async fn upload_file(
     file_path: PathBuf,
     api_name: String,
@@ -276,6 +328,7 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
 
     let api_name = ui.get_active_api().to_string();
 
+    ui.set_app_state(1);
     ui.set_state(AppState::Uploading);
     ui.set_upload_progress(0.0);
     ui.set_arc_path(calculate_arc_path(0.0).into());
@@ -287,32 +340,52 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
     controller.paused_flag.store(false, Ordering::Relaxed);
 
     let ui_weak = ui.as_weak();
-    let paused_flag = controller.paused_flag.clone();
+    let file_path = path;
+    let active_api_string = api_name;
 
     let task = tokio::spawn(async move {
-        match upload_file(path, api_name, ui_weak.clone(), paused_flag).await {
-            Ok(url) => {
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(ui) = ui_weak.upgrade() {
-                        ui.set_state(AppState::Success);
-                        ui.set_upload_progress(1.0);
-                        ui.set_arc_path(calculate_arc_path(1.0).into());
-                        ui.set_result_url(url.into());
-                    }
-                });
+        let client = reqwest::Client::builder()
+            .user_agent("Mozilla/5.0 (X11; Linux x86_64) CarbonDrop/1.0")
+            .build()
+            .unwrap_or_default();
+
+        let file_bytes = tokio::fs::read(&file_path).await.unwrap();
+        let file_name = std::path::Path::new(&file_path).file_name().unwrap().to_string_lossy().into_owned();
+        let part = reqwest::multipart::Part::bytes(file_bytes).file_name(file_name);
+        let form = reqwest::multipart::Form::new();
+
+        // Match based on active_api state from the UI
+        let (url, form) = match active_api_string.as_str() {
+            "0x0.st" => ("https://0x0.st", form.part("file", part)),
+            "Litterbox" => (
+                "https://litterbox.catbox.moe/resources/internals/api.php",
+                form.text("reqtype", "fileupload").text("time", "1h").part("fileToUpload", part)
+            ),
+            "file.io" => ("https://file.io/", form.part("file", part)),
+            _ => return,
+        };
+
+        let response = client.post(url).multipart(form).send().await.unwrap();
+        let response_text = response.text().await.unwrap();
+
+        // Extract URL (file.io requires JSON parsing, others are plain text)
+        let final_url = if active_api_string == "file.io" {
+            let json: serde_json::Value = serde_json::from_str(&response_text).unwrap();
+            json["link"].as_str().unwrap_or("").to_string()
+        } else {
+            response_text.trim().to_string()
+        };
+
+        // Send final_url back to Slint and set state to Success
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                ui.set_app_state(2);
+                ui.set_state(AppState::Success);
+                ui.set_upload_progress(1.0);
+                ui.set_arc_path(calculate_arc_path(1.0).into());
+                ui.set_result_url(final_url.into());
             }
-            Err(e) => {
-                let err_msg = e.to_string();
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(ui) = ui_weak.upgrade() {
-                        ui.set_state(AppState::Idle);
-                        ui.set_upload_progress(0.0);
-                        ui.set_arc_path(calculate_arc_path(0.0).into());
-                        ui.set_status_message(err_msg.into());
-                    }
-                });
-            }
-        }
+        });
     });
 
     let current_task_arc = controller.current_task.clone();
@@ -340,8 +413,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let _guard = rt.enter();
 
-    let ui = MainWindow::new()?;
+    let ui = AppWindow::new().unwrap();
     let controller = AppController::default();
+
+    // Start upload callback handler
+    let ui_weak_upload = ui.as_weak();
+    let controller_upload = controller.clone();
+    ui.on_start_upload(move |file_path_slint| {
+        let path = PathBuf::from(file_path_slint.as_str());
+        if let Some(ui) = ui_weak_upload.upgrade() {
+            start_upload(&ui, path, &controller_upload);
+        }
+    });
 
     // 1. API Switcher Callback
     let ui_weak = ui.as_weak();
@@ -442,33 +525,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(0);
     });
 
-    // 8. Hook into Winit Window Events for Native Drag & Drop
-    let ui_weak_winit = ui.as_weak();
-    let controller_winit = controller.clone();
-    ui.window().on_winit_window_event(move |_window, event| {
-        match event {
-            winit::event::WindowEvent::HoveredFile(_) => {
-                if let Some(ui) = ui_weak_winit.upgrade() {
-                    ui.set_is_drag_over(true);
-                }
-            }
-            winit::event::WindowEvent::HoveredFileCancelled => {
-                if let Some(ui) = ui_weak_winit.upgrade() {
-                    ui.set_is_drag_over(false);
-                }
-            }
-            winit::event::WindowEvent::DroppedFile(path) => {
-                if let Some(ui) = ui_weak_winit.upgrade() {
-                    ui.set_is_drag_over(false);
-                    start_upload(&ui, path.clone(), &controller_winit);
-                }
-            }
-            _ => {}
-        }
-        EventResult::Propagate
-    });
-
-    // 9. Command line argument support: carbon-drop <file_path> [--api <api>]
+    // Command line argument support: carbon-drop <file_path> [--api <api>]
     let args: Vec<String> = std::env::args().collect();
     let mut file_arg = None;
     let mut api_arg = None;
@@ -501,6 +558,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
         }
     }
+
+    let ui_handle = ui.as_weak();
+    ui.window().on_window_event(move |event| {
+        if let slint::WindowEvent::Drop(drop_event) = event {
+            if let Some(file) = drop_event.files.first() {
+                let file_path = file.path().to_string_lossy().to_string();
+                if let Some(ui) = ui_handle.upgrade() {
+                    ui.set_app_state(1); // Transition to Uploading state
+                    // Trigger the async upload task with file_path
+                    ui.invoke_start_upload(file_path.into());
+                }
+            }
+        }
+    });
 
     // Run Slint Event Loop
     ui.run()?;

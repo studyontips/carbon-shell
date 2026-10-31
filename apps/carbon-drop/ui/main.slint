@@ -11,6 +11,7 @@ export component MainWindow inherits Window {
     background: transparent;
 
     in-out property <AppState> state: AppState.Idle;
+    in-out property <int> app_state: 0;
     in-out property <string> active_api: "0x0.st";
     in-out property <float> upload_progress: 0.0;
     in-out property <string> file_name: "";
@@ -23,6 +24,7 @@ export component MainWindow inherits Window {
 
     callback select_api(string);
     callback browse_clicked();
+    callback start_upload(string);
     callback cancel_upload();
     callback pause_toggle();
     callback copy_link();
@@ -115,12 +117,9 @@ export component MainWindow inherits Window {
                     : @image-url("assets/dashed_border.svg");
             }
 
-            // Click touch area for Idle state
+            // Purely visual touch area for Idle state hover styling
             drop_touch := TouchArea {
                 enabled: root.state == AppState.Idle;
-                clicked => {
-                    root.browse_clicked();
-                }
             }
 
             // STATE OVERLAYS
@@ -148,7 +147,7 @@ export component MainWindow inherits Window {
                 }
 
                 Text {
-                    text: "or click anywhere in the zone to browse";
+                    text: "release file in the zone to upload";
                     color: #ffffff44;
                     font-size: 12px;
                     horizontal-alignment: center;
