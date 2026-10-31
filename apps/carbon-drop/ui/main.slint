@@ -14,7 +14,9 @@ export component MainWindow inherits Window {
 
     in-out property <AppState> state: AppState.Idle;
     in-out property <int> app_state: 0;
-    in-out property <string> active_api: "x0.at";
+    in-out property <bool> dropdown_open: false;
+    in-out property <string> active_api: "Gofile.io";
+    in-out property <string> active_capacity: "10GB+";
     in-out property <float> upload_progress: 0.0;
     in-out property <string> file_name: "";
     in-out property <string> result_url: "";
@@ -303,127 +305,44 @@ export component MainWindow inherits Window {
                 height: 100%;
                 alignment: space-between;
 
-                // TOP ROW: API Switcher Pill
+                // TOP ROW: Compact API Dropdown Selector
                 HorizontalLayout {
                     alignment: center;
+                    dropdown_box := Rectangle {
+                        width: 210px;
+                        height: 34px;
+                        border-radius: 8px;
+                        background: dropdown_touch.has-hover ? #181b24 : #12141a;
+                        border-width: 1px;
+                        border-color: root.dropdown_open ? #00f0ff88 : (dropdown_touch.has-hover ? #ffffff25 : #ffffff1f);
 
-                Rectangle {
-                    width: 380px;
-                    height: 38px;
-                    border-radius: 19px;
-                    background: #ffffff0a;
-                    border-width: 1px;
-                    border-color: #ffffff14;
-
-                    HorizontalLayout {
-                        alignment: space-around;
-                        padding-left: 8px;
-                        padding-right: 8px;
-
-                        // API 1: x0.at
-                        api_0x0 := Rectangle {
-                            height: 30px;
-                            border-radius: 15px;
-                            background: (root.active_api == "x0.at" || root.active_api == "0x0.st") ? #00f0ff22 : (api_0x0_touch.has-hover ? #ffffff0d : transparent);
-                            border-width: (root.active_api == "x0.at" || root.active_api == "0x0.st") ? 1px : 0px;
-                            border-color: #00f0ff55;
-                            api_0x0_touch := TouchArea {
-                                clicked => {
-                                    root.select_api("x0.at");
-                                }
-                            }
-
-                            HorizontalLayout {
-                                padding-left: 12px;
-                                padding-right: 12px;
-                                alignment: center;
-                                Text {
-                                    text: ((root.active_api == "x0.at" || root.active_api == "0x0.st") ? "◆" : "◇") + " x0.at";
-                                    color: (root.active_api == "x0.at" || root.active_api == "0x0.st") ? #00f0ff : #ffffff88;
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    vertical-alignment: center;
-                                    horizontal-alignment: center;
-                                }
-                            }
+                        dropdown_touch := TouchArea {
+                            clicked => { root.dropdown_open = !root.dropdown_open; }
                         }
 
-                        // Divider 1
-                        Text {
-                            text: "|";
-                            color: #ffffff22;
-                            font-size: 12px;
-                            vertical-alignment: center;
-                        }
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: space-between;
 
-                        // API 2: kappa.lol
-                        api_kappa := Rectangle {
-                            height: 30px;
-                            border-radius: 15px;
-                            background: (root.active_api == "kappa.lol" || root.active_api == "Litterbox") ? #00f0ff22 : (api_kappa_touch.has-hover ? #ffffff0d : transparent);
-                            border-width: (root.active_api == "kappa.lol" || root.active_api == "Litterbox") ? 1px : 0px;
-                            border-color: #00f0ff55;
-
-                            api_kappa_touch := TouchArea {
-                                clicked => {
-                                    root.select_api("kappa.lol");
-                                }
+                            Text {
+                                text: "◆ " + root.active_api + " (" + root.active_capacity + ")";
+                                color: #00f0ff;
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
                             }
 
-                            HorizontalLayout {
-                                padding-left: 12px;
-                                padding-right: 12px;
-                                alignment: center;
-                                Text {
-                                    text: ((root.active_api == "kappa.lol" || root.active_api == "Litterbox") ? "◆" : "◇") + " kappa.lol";
-                                    color: (root.active_api == "kappa.lol" || root.active_api == "Litterbox") ? #00f0ff : #ffffff88;
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    vertical-alignment: center;
-                                    horizontal-alignment: center;
-                                }
+                            Text {
+                                text: root.dropdown_open ? "▲" : "▾";
+                                color: #ffffff88;
+                                font-size: 12px;
+                                font-weight: 700;
+                                vertical-alignment: center;
                             }
                         }
-
-                        // Divider 2
-                        Text {
-                            text: "|";
-                            color: #ffffff22;
-                            font-size: 12px;
-                            vertical-alignment: center;
-                        }
-
-                        // API 3: uguu.se
-                        api_uguu := Rectangle {
-                            height: 30px;
-                            border-radius: 15px;
-                            background: root.active_api == "uguu.se" ? #00f0ff22 : (api_uguu_touch.has-hover ? #ffffff0d : transparent);
-                            border-width: root.active_api == "uguu.se" ? 1px : 0px;
-                            border-color: #00f0ff55;
-
-                            api_uguu_touch := TouchArea {
-                                clicked => {
-                                    root.select_api("uguu.se");
-                                }
-                            }
-
-                            HorizontalLayout {
-                                padding-left: 12px;
-                                padding-right: 12px;
-                                alignment: center;
-                                Text {
-                                    text: (root.active_api == "uguu.se" ? "◆" : "◇") + " uguu.se";
-                                    color: root.active_api == "uguu.se" ? #00f0ff : #ffffff88;
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    vertical-alignment: center;
-                                    horizontal-alignment: center;
-                                }
-                            }
-                        }
+                    }
                 }
-            }
-        }
 
             // BOTTOM ROW: Contextual Actions
             HorizontalLayout {
@@ -437,7 +356,7 @@ export component MainWindow inherits Window {
                     alignment: space-between;
 
                     Text {
-                        text: "Max file size: 512MB";
+                        text: "Max file size: " + root.active_capacity;
                         color: #ffffff55;
                         font-size: 12px;
                         vertical-alignment: center;
@@ -593,6 +512,203 @@ export component MainWindow inherits Window {
             }
         }
     }
-}
+
+    // Dropdown dismiss backdrop
+        TouchArea {
+            visible: root.dropdown_open;
+            enabled: root.dropdown_open;
+            x: 0px;
+            y: 0px;
+            width: 100%;
+            height: 100%;
+            clicked => {
+                root.dropdown_open = false;
+            }
+        }
+
+        // Floating Dropdown Menu Card (floats above control deck)
+        Rectangle {
+            visible: root.dropdown_open;
+            x: 215px;
+            y: 192px;
+            width: 210px;
+            height: 178px;
+            border-radius: 8px;
+            background: #14171f;
+            border-width: 1px;
+            border-color: #00f0ff44;
+            clip: true;
+
+            VerticalLayout {
+                padding: 4px;
+                spacing: 2px;
+
+                // Option 1: Gofile.io
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: opt_gofile_touch.has-hover ? #00f0ff1a : (root.active_api == "Gofile.io" ? #00f0ff10 : transparent);
+                    opt_gofile_touch := TouchArea {
+                        clicked => {
+                            root.active_api = "Gofile.io";
+                            root.active_capacity = "10GB+";
+                            root.select_api("Gofile.io");
+                            root.dropdown_open = false;
+                        }
+                    }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: space-between;
+                        Text {
+                            text: (root.active_api == "Gofile.io" ? "◆ " : "  ") + "Gofile.io";
+                            color: root.active_api == "Gofile.io" ? #00f0ff : (opt_gofile_touch.has-hover ? #ffffff : #ffffffcc);
+                            font-size: 12px;
+                            font-weight: root.active_api == "Gofile.io" ? 600 : 400;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "10GB+";
+                            color: root.active_api == "Gofile.io" ? #00f0ffaa : #ffffff66;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Option 2: Buzzheavier
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: opt_buzz_touch.has-hover ? #00f0ff1a : (root.active_api == "Buzzheavier" ? #00f0ff10 : transparent);
+                    opt_buzz_touch := TouchArea {
+                        clicked => {
+                            root.active_api = "Buzzheavier";
+                            root.active_capacity = "10GB+";
+                            root.select_api("Buzzheavier");
+                            root.dropdown_open = false;
+                        }
+                    }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: space-between;
+                        Text {
+                            text: (root.active_api == "Buzzheavier" ? "◆ " : "  ") + "Buzzheavier";
+                            color: root.active_api == "Buzzheavier" ? #00f0ff : (opt_buzz_touch.has-hover ? #ffffff : #ffffffcc);
+                            font-size: 12px;
+                            font-weight: root.active_api == "Buzzheavier" ? 600 : 400;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "10GB+";
+                            color: root.active_api == "Buzzheavier" ? #00f0ffaa : #ffffff66;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Option 3: Bashupload
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: opt_bash_touch.has-hover ? #00f0ff1a : (root.active_api == "Bashupload" ? #00f0ff10 : transparent);
+                    opt_bash_touch := TouchArea {
+                        clicked => {
+                            root.active_api = "Bashupload";
+                            root.active_capacity = "25GB";
+                            root.select_api("Bashupload");
+                            root.dropdown_open = false;
+                        }
+                    }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: space-between;
+                        Text {
+                            text: (root.active_api == "Bashupload" ? "◆ " : "  ") + "Bashupload";
+                            color: root.active_api == "Bashupload" ? #00f0ff : (opt_bash_touch.has-hover ? #ffffff : #ffffffcc);
+                            font-size: 12px;
+                            font-weight: root.active_api == "Bashupload" ? 600 : 400;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "25GB";
+                            color: root.active_api == "Bashupload" ? #00f0ffaa : #ffffff66;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Option 4: x0.at
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: opt_x0_touch.has-hover ? #00f0ff1a : (root.active_api == "x0.at" ? #00f0ff10 : transparent);
+                    opt_x0_touch := TouchArea {
+                        clicked => {
+                            root.active_api = "x0.at";
+                            root.active_capacity = "1GB";
+                            root.select_api("x0.at");
+                            root.dropdown_open = false;
+                        }
+                    }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: space-between;
+                        Text {
+                            text: (root.active_api == "x0.at" ? "◆ " : "  ") + "x0.at";
+                            color: root.active_api == "x0.at" ? #00f0ff : (opt_x0_touch.has-hover ? #ffffff : #ffffffcc);
+                            font-size: 12px;
+                            font-weight: root.active_api == "x0.at" ? 600 : 400;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "1GB";
+                            color: root.active_api == "x0.at" ? #00f0ffaa : #ffffff66;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Option 5: kappa.lol
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: opt_kappa_touch.has-hover ? #00f0ff1a : (root.active_api == "kappa.lol" ? #00f0ff10 : transparent);
+                    opt_kappa_touch := TouchArea {
+                        clicked => {
+                            root.active_api = "kappa.lol";
+                            root.active_capacity = "100MB";
+                            root.select_api("kappa.lol");
+                            root.dropdown_open = false;
+                        }
+                    }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: space-between;
+                        Text {
+                            text: (root.active_api == "kappa.lol" ? "◆ " : "  ") + "kappa.lol";
+                            color: root.active_api == "kappa.lol" ? #00f0ff : (opt_kappa_touch.has-hover ? #ffffff : #ffffffcc);
+                            font-size: 12px;
+                            font-weight: root.active_api == "kappa.lol" ? 600 : 400;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "100MB";
+                            color: root.active_api == "kappa.lol" ? #00f0ffaa : #ffffff66;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 }
