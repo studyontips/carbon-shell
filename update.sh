@@ -331,7 +331,7 @@ QML_PATH="$HOME/.local/share/quickshell/carbon/modules/CarbonDrop.qml"
 if [ ! -f "$QML_PATH" ]; then
     QML_PATH="$HOME/.config/carbon/modules/CarbonDrop.qml"
 fi
-exec quickshell -p "$QML_PATH" "$@"
+exec quickshell -d -p "$QML_PATH" "$@"
 EOF
 chmod +x "$BIN_DIR/carbon-drop"
 
