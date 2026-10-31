@@ -350,25 +350,30 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
 
     let task = tokio::spawn(async move {
         let mut cmd = tokio::process::Command::new("curl");
-        cmd.arg("-sS") // Silent but show errors
-           .arg("-L"); // Follow redirects
+        cmd.arg("-sS"); // Do NOT use -L on POST requests as it converts POST to GET on 301/302!
 
         match active_api_string.as_str() {
             "0x0.st" => {
-                // 0x0.st requires a custom non-browser User-Agent
                 cmd.arg("-A").arg("CarbonDrop/1.0")
-                   .arg("-F").arg(format!("file=@{}", file_path))
+                   .arg("-F").arg(format!("file=@\"{}\"", file_path))
                    .arg("https://0x0.st");
             }
             "Litterbox" => {
-                cmd.arg("-A").arg("curl/8.7.1")
+                cmd.arg("-L")
+                   .arg("-H").arg("User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0")
+                   .arg("-H").arg("Origin: https://litterbox.catbox.moe")
+                   .arg("-H").arg("Referer: https://litterbox.catbox.moe/")
                    .arg("-F").arg("reqtype=fileupload")
                    .arg("-F").arg("time=1h")
-                   .arg("-F").arg(format!("fileToUpload=@{}", file_path))
+                   .arg("-F").arg(format!("fileToUpload=@\"{}\"", file_path))
                    .arg("https://litterbox.catbox.moe/resources/internals/api.php");
             }
             "file.io" => {
-                cmd.arg("-F").arg(format!("file=@{}", file_path))
+                cmd.arg("-L")
+                   .arg("--post301").arg("--post302").arg("--post303") // Keep POST method across redirects!
+                   .arg("-H").arg("Accept: application/json")
+                   .arg("-H").arg("User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0")
+                   .arg("-F").arg(format!("file=@\"{}\"", file_path))
                    .arg("https://file.io/");
             }
             _ => return,
@@ -384,9 +389,9 @@ fn start_upload(ui: &MainWindow, path: PathBuf, controller: &AppController) {
                 if !out.status.success() || stdout.is_empty() {
                     format!("Error: {}", if stderr.is_empty() { "Upload failed" } else { &stderr })
                 } else if stdout.starts_with("<!") || stdout.starts_with("<html") {
-                    // Print the raw HTML to terminal so we can debug if blocked
-                    eprintln!("API returned HTML:\n{}", stdout);
-                    "Error: Host blocked request or ISP restriction".to_string()
+                    // Print the first 300 characters of stdout to terminal so we can debug if blocked
+                    eprintln!("API returned HTML:\n{}", &stdout[..stdout.len().min(300)]);
+                    "Error: Cloudflare challenge on host (Try 0x0.st)".to_string()
                 } else if active_api_string == "file.io" {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
                         json["link"].as_str().unwrap_or("Error: No link in JSON").to_string()
@@ -431,6 +436,71 @@ fn copy_to_clipboard(text: &str) {
         .spawn();
 }
 
+fn urlencoding_decode(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '%' {
+            let hex: String = chars.by_ref().take(2).collect();
+            if hex.len() == 2 {
+                if let Ok(byte) = u8::from_str_radix(&hex, 16) {
+                    result.push(byte as char);
+                    continue;
+                }
+            }
+            result.push('%');
+            result.push_str(&hex);
+        } else if c == '+' {
+            result.push(' ');
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+fn get_clipboard_file_path() -> Option<PathBuf> {
+    let output = std::process::Command::new("wl-paste")
+        .arg("-t")
+        .arg("text/uri-list")
+        .output()
+        .ok();
+
+    let text = match output {
+        Some(out) if out.status.success() && !out.stdout.is_empty() => {
+            String::from_utf8_lossy(&out.stdout).to_string()
+        }
+        _ => {
+            let plain_out = std::process::Command::new("wl-paste").output().ok();
+            match plain_out {
+                Some(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).to_string(),
+                _ => String::new(),
+            }
+        }
+    };
+
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let raw_path = if let Some(stripped) = line.strip_prefix("file://") {
+            stripped
+        } else {
+            line
+        };
+
+        let decoded = urlencoding_decode(raw_path);
+        let path = PathBuf::from(&decoded);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::env::set_var("WINIT_UNIX_BACKEND", "x11");
 
@@ -450,6 +520,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let path = PathBuf::from(file_path_slint.as_str());
         if let Some(ui) = ui_weak_upload.upgrade() {
             start_upload(&ui, path, &controller_upload);
+        }
+    });
+
+    // Paste from clipboard callback handler
+    let ui_weak_paste = ui.as_weak();
+    let controller_paste = controller.clone();
+    ui.on_paste_from_clipboard(move || {
+        if let Some(path) = get_clipboard_file_path() {
+            if let Some(ui) = ui_weak_paste.upgrade() {
+                start_upload(&ui, path, &controller_paste);
+            }
         }
     });
 

@@ -35,9 +35,20 @@ export component MainWindow inherits Window {
     callback copy_link();
     callback reset_state();
     callback close_window();
+    callback paste_from_clipboard();
 
-    // Main dark frosted glass container
-    main_card := Rectangle {
+    forward-focus: focus_scope;
+    focus_scope := FocusScope {
+        key-pressed(event) => {
+            if (event.modifiers.control && (event.text == "v" || event.text == "V")) {
+                root.paste_from_clipboard();
+                return accept;
+            }
+            return reject;
+        }
+
+        // Main dark frosted glass container
+        main_card := Rectangle {
         width: 100%;
         height: 100%;
         border-radius: 16px;
@@ -429,19 +440,40 @@ export component MainWindow inherits Window {
                         vertical-alignment: center;
                     }
 
-                    // Flush manual browse button
-                    TouchArea {
-                        width: 120px;
-                        clicked => {
-                            root.open_file_dialog();
+                    HorizontalLayout {
+                        spacing: 12px;
+                        alignment: end;
+
+                        // Flush Paste File button
+                        TouchArea {
+                            width: 130px;
+                            clicked => {
+                                root.paste_from_clipboard();
+                            }
+                            Text {
+                                text: "[ 📋 PASTE FILE ]";
+                                color: parent.pressed ? #ffffff : #8ee8a8;
+                                font-size: 13px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                                horizontal-alignment: center;
+                            }
                         }
-                        Text {
-                            text: "[ ⇪ BROWSE ]";
-                            color: parent.pressed ? #ffffff : #8ee8a8;
-                            font-size: 13px;
-                            font-weight: 700;
-                            vertical-alignment: center;
-                            horizontal-alignment: center;
+
+                        // Flush manual browse button
+                        TouchArea {
+                            width: 110px;
+                            clicked => {
+                                root.open_file_dialog();
+                            }
+                            Text {
+                                text: "[ ⇪ BROWSE ]";
+                                color: parent.pressed ? #ffffff : #8ee8a8;
+                                font-size: 13px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                                horizontal-alignment: center;
+                            }
                         }
                     }
                 }
@@ -558,5 +590,6 @@ export component MainWindow inherits Window {
             }
         }
     }
+}
 }
 }
