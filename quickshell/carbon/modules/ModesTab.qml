@@ -44,8 +44,63 @@ Item {
     property int activePreviewWorkspace: 1
     property bool centerExpanded: false
 
-    // Draggable Y Position (Unified: All 3 notch bars move together down/up)
+    // ── Draggable Y Position & Magnetic Docking Animation ────────────────────
     property real notchBarsY: 0
+    property string notchDockPosition: "top" // "top" | "bottom"
+    property bool isDraggingNotch: false
+    readonly property real currentBarHeight: root.centerExpanded ? 240 : root.previewNotchHeight
+    readonly property real notchMaxY: Math.max(0, (blueprintCard ? blueprintCard.height : 232) - currentBarHeight)
+
+    Behavior on notchBarsY {
+        enabled: !root.isDraggingNotch
+        NumberAnimation {
+            duration: 480
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.14
+        }
+    }
+
+    onCenterExpandedChanged: {
+        if (notchDockPosition === "bottom") {
+            notchBarsY = notchMaxY
+        }
+    }
+
+    function dockToTop() {
+        root.isDraggingNotch = false
+        root.notchDockPosition = "top"
+        root.notchBarsY = 0
+        topFlashAnim.start()
+        root.saveBarEdgeConfig("top")
+    }
+
+    function dockToBottom() {
+        root.isDraggingNotch = false
+        root.notchDockPosition = "bottom"
+        root.notchBarsY = root.notchMaxY
+        bottomFlashAnim.start()
+        root.saveBarEdgeConfig("bottom")
+    }
+
+    function toggleNotchDock() {
+        if (root.notchDockPosition === "top") root.dockToBottom()
+        else root.dockToTop()
+    }
+
+    function resetBarPositions() {
+        dockToTop()
+    }
+
+    function saveBarEdgeConfig(edge) {
+        var script = "import json, os\n" +
+            "dir = os.environ.get('CARBON_CONFIG_DIR', os.path.expanduser('~/.config/carbon'))\n" +
+            "os.makedirs(dir, exist_ok=True)\n" +
+            "p = os.path.join(dir, 'carbon-bar-mode.json')\n" +
+            "d = json.load(open(p)) if os.path.exists(p) else {}\n" +
+            "d['mainBarEdge'] = '" + edge + "'\n" +
+            "json.dump(d, open(p, 'w'), indent=2)\n"
+        Quickshell.execDetached(["python3", "-c", script])
+    }
 
     // Geometry & Atmosphere Preview Settings
     property int previewNotchHeight: 34
@@ -54,10 +109,6 @@ Item {
     property real previewNotchOpacity: 0.94
     property bool previewBlur: true
     property int previewAppGap: 6
-
-    function resetBarPositions() {
-        notchBarsY = 0
-    }
 
     // ── Vanish Mode State & Configuration ────────────────────────────────────
     property bool vanishMediaPlaying: true
@@ -89,6 +140,13 @@ Item {
                 if (m === "notch" || m === "pill") root.currentMode = 0
                 else if (m === "minimal" || m === "minimal_notch") root.currentMode = 1
                 else if (m === "nucleus" || m === "vanish") root.currentMode = 2
+            }
+            if (d.mainBarEdge === "bottom") {
+                root.notchDockPosition = "bottom"
+                root.notchBarsY = root.notchMaxY
+            } else if (d.mainBarEdge === "top") {
+                root.notchDockPosition = "top"
+                root.notchBarsY = 0
             }
             if (d.wallpaperAnimation) root.vanishWallpaperAnimation = String(d.wallpaperAnimation)
             if (d.wallpaperDuration) root.vanishWallpaperDuration = Number(d.wallpaperDuration)
@@ -282,7 +340,7 @@ Item {
                         border.width: 1
                         clip: true
 
-                        // Dotted Matrix Grid Canvas (Crisp 1.2px dots, 18px grid)
+                        // ── Plain Dotted Matrix Canvas (Crisp 1.2px dots, 18px grid) ──
                         Canvas {
                             id: blueprintDots
                             anchors.fill: parent
@@ -302,93 +360,103 @@ Item {
                             }
                         }
 
-                        // Top Ruler & Info Header
-                        Rectangle {
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            height: 22
-                            color: Qt.rgba(0, 0, 0, 0.35)
-                            border.color: Qt.rgba(1, 1, 1, 0.06)
-                            border.width: 1
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-
-                                Text {
-                                    text: "BLUEPRINT // NOTCH SYSTEM (HOLD ANY BAR TO DRAG DOWN • UNIFIED Y-AXIS)"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontPx(8.5)
-                                    font.weight: Font.Bold
-                                    color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.85)
-                                }
-
-                                Item { Layout.fillWidth: true }
-
-                                Rectangle {
-                                    Layout.preferredHeight: 18
-                                    Layout.preferredWidth: 60
-                                    radius: 4
-                                    color: resetNotchMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.15) : Qt.rgba(1, 1, 1, 0.06)
-                                    border.color: Qt.rgba(1, 1, 1, 0.15)
-                                    border.width: 1
-
-                                    RowLayout {
-                                        anchors.centerIn: parent
-                                        spacing: 3
-                                        Text {
-                                            text: "↺"
-                                            font.pixelSize: 10
-                                            color: Theme.primary
-                                        }
-                                        Text {
-                                            text: "RESET"
-                                            font.family: Theme.fontMono
-                                            font.pixelSize: Theme.fontPx(8)
-                                            font.weight: Font.Bold
-                                            color: Qt.rgba(1, 1, 1, 0.85)
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        id: resetNotchMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: root.resetBarPositions()
-                                    }
-                                }
-                            }
-                        }
-
-                        // ── Blueprint Screen Workspace ─────────────────────
+                        // ── Blueprint Screen Workspace (Connected to Card Borders) ──
                         Item {
                             id: blueprintWorkspace
                             anchors.fill: parent
-                            anchors.topMargin: 24
 
-                            // Screen Top Bezel Edge (Baseline)
+                            // Top Border Snap Flash Effect
                             Rectangle {
-                                id: screenBezelBaseline
+                                id: topSnapFlash
                                 anchors.top: parent.top
                                 anchors.left: parent.left
                                 anchors.right: parent.right
-                                height: 1.5
-                                color: Qt.rgba(1, 1, 1, 0.35)
-                                z: 25
+                                height: 3
+                                color: Theme.primary
+                                opacity: 0.0
+                                z: 30
+
+                                SequentialAnimation {
+                                    id: topFlashAnim
+                                    NumberAnimation { target: topSnapFlash; property: "opacity"; to: 0.85; duration: 80; easing.type: Easing.OutQuad }
+                                    NumberAnimation { target: topSnapFlash; property: "opacity"; to: 0.0; duration: 320; easing.type: Easing.OutQuad }
+                                }
                             }
 
-                            // Drop Connection Traces Canvas (Vertical Guide Lines from Bezel to Notch)
-                            Canvas {
-                                id: notchTraceCanvas
+                            // Bottom Border Snap Flash Effect
+                            Rectangle {
+                                id: bottomSnapFlash
+                                anchors.bottom: parent.bottom
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 3
+                                color: Theme.primary
+                                opacity: 0.0
+                                z: 30
+
+                                SequentialAnimation {
+                                    id: bottomFlashAnim
+                                    NumberAnimation { target: bottomSnapFlash; property: "opacity"; to: 0.85; duration: 80; easing.type: Easing.OutQuad }
+                                    NumberAnimation { target: bottomSnapFlash; property: "opacity"; to: 0.0; duration: 320; easing.type: Easing.OutQuad }
+                                }
+                            }
+
+                            // Top Dock Receiver Bay (Faint dashed bay shown while dragging)
+                            Rectangle {
                                 anchors.top: parent.top
                                 anchors.left: parent.left
                                 anchors.right: parent.right
-                                height: Math.max(1, root.notchBarsY + 40)
-                                visible: root.notchBarsY > 2
+                                height: root.previewNotchHeight
+                                color: root.notchBarsY < (root.notchMaxY * 0.35) ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : "transparent"
+                                border.color: root.notchBarsY < (root.notchMaxY * 0.35) ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40) : Qt.rgba(1, 1, 1, 0.10)
+                                border.width: 1
+                                opacity: (root.isDraggingNotch && root.notchBarsY > 15) ? 1.0 : 0.0
                                 z: 1
+                                Behavior on opacity { NumberAnimation { duration: 180 } }
+                                Behavior on color { ColorAnimation { duration: 180 } }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "↑ RELEASE TO DOCK TO TOP BEZEL"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontPx(8.5)
+                                    font.weight: Font.Bold
+                                    color: Theme.primary
+                                    visible: parent.opacity > 0.5
+                                }
+                            }
+
+                            // Bottom Dock Receiver Bay (Faint dashed bay shown while dragging)
+                            Rectangle {
+                                anchors.bottom: parent.bottom
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: root.previewNotchHeight
+                                color: root.notchBarsY > (root.notchMaxY * 0.65) ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08) : "transparent"
+                                border.color: root.notchBarsY > (root.notchMaxY * 0.65) ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40) : Qt.rgba(1, 1, 1, 0.10)
+                                border.width: 1
+                                opacity: (root.isDraggingNotch && root.notchBarsY < (root.notchMaxY - 15)) ? 1.0 : 0.0
+                                z: 1
+                                Behavior on opacity { NumberAnimation { duration: 180 } }
+                                Behavior on color { ColorAnimation { duration: 180 } }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "↓ RELEASE TO DOCK TO BOTTOM BEZEL"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontPx(8.5)
+                                    font.weight: Font.Bold
+                                    color: Theme.primary
+                                    visible: parent.opacity > 0.5
+                                }
+                            }
+
+                            // Drop / Rise Connection Traces Canvas (Vertical Guide Lines)
+                            Canvas {
+                                id: notchTraceCanvas
+                                anchors.fill: parent
+                                visible: root.notchBarsY > 3 && root.notchBarsY < (root.notchMaxY - 3)
+                                z: 2
 
                                 Connections {
                                     target: root
@@ -400,87 +468,43 @@ Item {
                                 onPaint: {
                                     var ctx = getContext("2d")
                                     ctx.clearRect(0, 0, width, height)
-                                    var y1 = 0
-                                    var y2 = root.notchBarsY
 
-                                    ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.55)
+                                    var inUpperHalf = root.notchBarsY <= (root.notchMaxY * 0.5)
+                                    var yTarget = inUpperHalf ? 0 : height
+                                    var yNotch = inUpperHalf ? root.notchBarsY : (root.notchBarsY + root.currentBarHeight)
+
+                                    ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
                                     ctx.lineWidth = 1.0
                                     ctx.setLineDash([3, 3])
 
-                                    // 1. Left bar connection traces:
-                                    // Left screen edge (x = 0)
-                                    ctx.beginPath()
-                                    ctx.moveTo(1, y1)
-                                    ctx.lineTo(1, y2)
-                                    ctx.stroke()
-
-                                    // Right ear tip: at leftBarWrapper.x + leftBarWrapper.width
+                                    // Left ear tip
                                     var leftEarX = Math.round(leftBarWrapper.x + leftBarWrapper.width)
                                     ctx.beginPath()
-                                    ctx.moveTo(leftEarX, y1)
-                                    ctx.lineTo(leftEarX, y2)
+                                    ctx.moveTo(1, yTarget)
+                                    ctx.lineTo(1, yNotch)
+                                    ctx.moveTo(leftEarX, yTarget)
+                                    ctx.lineTo(leftEarX, yNotch)
                                     ctx.stroke()
 
-                                    // 2. Center bar connection traces:
-                                    // Left ear tip and Right ear tip
+                                    // Center ear tips
                                     var centerLeftX = Math.round(centerBarWrapper.x)
                                     var centerRightX = Math.round(centerBarWrapper.x + centerBarWrapper.width)
                                     ctx.beginPath()
-                                    ctx.moveTo(centerLeftX, y1)
-                                    ctx.lineTo(centerLeftX, y2)
-                                    ctx.moveTo(centerRightX, y1)
-                                    ctx.lineTo(centerRightX, y2)
+                                    ctx.moveTo(centerLeftX, yTarget)
+                                    ctx.lineTo(centerLeftX, yNotch)
+                                    ctx.moveTo(centerRightX, yTarget)
+                                    ctx.lineTo(centerRightX, yNotch)
                                     ctx.stroke()
 
-                                    // 3. Right bar connection traces:
-                                    // Left ear tip and Right screen edge
+                                    // Right ear tips
                                     var rightEarX = Math.round(rightBarWrapper.x)
                                     var rightEdgeX = Math.round(width - 1)
                                     ctx.beginPath()
-                                    ctx.moveTo(rightEarX, y1)
-                                    ctx.lineTo(rightEarX, y2)
-                                    ctx.moveTo(rightEdgeX, y1)
-                                    ctx.lineTo(rightEdgeX, y2)
+                                    ctx.moveTo(rightEarX, yTarget)
+                                    ctx.lineTo(rightEarX, yNotch)
+                                    ctx.moveTo(rightEdgeX, yTarget)
+                                    ctx.lineTo(rightEdgeX, yNotch)
                                     ctx.stroke()
-
-                                    // Top bezel ticks at each ear
-                                    ctx.setLineDash([])
-                                    ctx.strokeStyle = Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
-                                    var tickLen = 4
-                                    ctx.beginPath()
-                                    ctx.moveTo(leftEarX - tickLen, y1)
-                                    ctx.lineTo(leftEarX + tickLen, y1)
-                                    ctx.moveTo(centerLeftX - tickLen, y1)
-                                    ctx.lineTo(centerLeftX + tickLen, y1)
-                                    ctx.moveTo(centerRightX - tickLen, y1)
-                                    ctx.lineTo(centerRightX + tickLen, y1)
-                                    ctx.moveTo(rightEarX - tickLen, y1)
-                                    ctx.lineTo(rightEarX + tickLen, y1)
-                                    ctx.stroke()
-                                }
-                            }
-
-                            // Offset Indicator Badge
-                            Rectangle {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                y: Math.max(2, (root.notchBarsY - 18) / 2)
-                                height: 16
-                                width: dropDistText.implicitWidth + 14
-                                radius: 4
-                                color: Qt.rgba(0, 0, 0, 0.85)
-                                border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.50)
-                                border.width: 1
-                                visible: root.notchBarsY > 12
-                                z: 22
-
-                                Text {
-                                    id: dropDistText
-                                    anchors.centerIn: parent
-                                    text: "↕ OFFSET: +" + Math.round(root.notchBarsY) + "px"
-                                    font.family: Theme.fontMono
-                                    font.pixelSize: Theme.fontPx(8)
-                                    font.weight: Font.Bold
-                                    color: Theme.primary
                                 }
                             }
 
@@ -490,32 +514,55 @@ Item {
                                 anchors.left: parent.left
                                 anchors.right: parent.right
                                 y: root.notchBarsY
-                                height: Math.max(root.centerExpanded ? 240 : root.previewNotchHeight, root.previewNotchHeight)
-
-                                DragHandler {
-                                    id: notchUnifiedDragHandler
-                                    target: notchBarsContainer
-                                    xAxis.enabled: false
-                                    yAxis.enabled: true
-                                    yAxis.minimum: 0
-                                    yAxis.maximum: Math.max(0, blueprintWorkspace.height - (root.centerExpanded ? 240 : root.previewNotchHeight) - 10)
-                                    onActiveChanged: {
-                                        if (!active) root.notchBarsY = notchBarsContainer.y
-                                    }
-                                }
+                                height: root.currentBarHeight
+                                z: 10
+                                scale: root.isDraggingNotch ? 0.985 : 1.0
+                                Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
                                 MouseArea {
                                     id: notchUnifiedDragArea
                                     anchors.fill: parent
                                     cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-                                    drag.target: notchBarsContainer
-                                    drag.axis: Drag.YAxis
-                                    drag.minimumY: 0
-                                    drag.maximumY: Math.max(0, blueprintWorkspace.height - (root.centerExpanded ? 240 : root.previewNotchHeight) - 10)
-                                    onPositionChanged: {
-                                        if (pressed) root.notchBarsY = notchBarsContainer.y
+                                    property real startMouseScreenY: 0
+                                    property real startNotchY: 0
+                                    property bool movedBeyondThreshold: false
+
+                                    onPressed: (mouse) => {
+                                        startMouseScreenY = mouse.y
+                                        startNotchY = root.notchBarsY
+                                        movedBeyondThreshold = false
+                                        root.isDraggingNotch = true
                                     }
-                                    onReleased: root.notchBarsY = notchBarsContainer.y
+
+                                    onPositionChanged: (mouse) => {
+                                        if (!pressed) return
+                                        var delta = mouse.y - startMouseScreenY
+                                        if (Math.abs(delta) > 4) {
+                                            movedBeyondThreshold = true
+                                        }
+                                        var newY = startNotchY + delta
+                                        var maxY = root.notchMaxY
+                                        root.notchBarsY = Math.max(0, Math.min(maxY, newY))
+                                    }
+
+                                    onReleased: (mouse) => {
+                                        root.isDraggingNotch = false
+                                        if (!movedBeyondThreshold) {
+                                            // Click inside center bar region toggles expansion
+                                            var localX = mouse.x
+                                            if (localX >= centerBarWrapper.x && localX <= (centerBarWrapper.x + centerBarWrapper.width)) {
+                                                root.centerExpanded = !root.centerExpanded
+                                                return
+                                            }
+                                        }
+                                        // Finished dragging: check target docking border
+                                        var maxY = root.notchMaxY
+                                        if (root.notchBarsY > (maxY * 0.45)) {
+                                            root.dockToBottom()
+                                        } else {
+                                            root.dockToTop()
+                                        }
+                                    }
                                 }
 
                                 // ── 1. LEFT NOTCH BAR (Flush Left Edge, Fillet on Right) ──
@@ -525,21 +572,7 @@ Item {
                                     y: 0
                                     width: leftNotchBar.width
                                     height: leftNotchBar.height
-                                    z: leftDragArea.pressed ? 10 : 2
-
-                                    MouseArea {
-                                        id: leftDragArea
-                                        anchors.fill: parent
-                                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-                                        drag.target: notchBarsContainer
-                                        drag.axis: Drag.YAxis
-                                        drag.minimumY: 0
-                                        drag.maximumY: Math.max(0, blueprintWorkspace.height - (root.centerExpanded ? 240 : root.previewNotchHeight) - 10)
-                                        onPositionChanged: {
-                                            if (pressed) root.notchBarsY = notchBarsContainer.y
-                                        }
-                                        onReleased: root.notchBarsY = notchBarsContainer.y
-                                    }
+                                    z: 2
 
                                     NotchContainer {
                                         id: leftNotchBar
@@ -550,6 +583,7 @@ Item {
                                         notchOpacity: root.previewNotchOpacity
                                         implicitHeight: root.previewNotchHeight
                                         height: root.previewNotchHeight
+                                        attachedBottom: root.notchBarsY > (root.notchMaxY * 0.5)
                                         horizontalPadding: 10
                                         contentSpacing: 8
                                         mouseArea.enabled: false
@@ -627,24 +661,7 @@ Item {
                                     y: 0
                                     width: centerNotchBar.width
                                     height: centerNotchBar.height
-                                    z: root.centerExpanded ? 20 : (centerDragArea.pressed ? 10 : 3)
-
-                                    MouseArea {
-                                        id: centerDragArea
-                                        anchors.fill: parent
-                                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-                                        drag.target: notchBarsContainer
-                                        drag.axis: Drag.YAxis
-                                        drag.minimumY: 0
-                                        drag.maximumY: Math.max(0, blueprintWorkspace.height - (root.centerExpanded ? 240 : root.previewNotchHeight) - 10)
-                                        onPositionChanged: {
-                                            if (pressed) root.notchBarsY = notchBarsContainer.y
-                                        }
-                                        onReleased: root.notchBarsY = notchBarsContainer.y
-                                        onClicked: {
-                                            root.centerExpanded = !root.centerExpanded
-                                        }
-                                    }
+                                    z: root.centerExpanded ? 20 : 3
 
                                     NotchContainer {
                                         id: centerNotchBar
@@ -654,9 +671,10 @@ Item {
                                         bottomRadius: root.centerExpanded ? 18 : root.previewBottomRadius
                                         notchOpacity: root.previewNotchOpacity
                                         implicitHeight: root.centerExpanded ? 240 : root.previewNotchHeight
-                                        implicitWidth: root.centerExpanded ? Math.min(blueprintWorkspace.width - 40, 560) : (contentImplicitWidth + (leftFillet ? filletRadius : 0) + (rightFillet ? filletRadius : 0) + (horizontalPadding * 2))
+                                        implicitWidth: root.centerExpanded ? Math.min(blueprintCard.width - 40, 560) : (contentImplicitWidth + (leftFillet ? filletRadius : 0) + (rightFillet ? filletRadius : 0) + (horizontalPadding * 2))
                                         height: implicitHeight
                                         width: implicitWidth
+                                        attachedBottom: root.notchBarsY > (root.notchMaxY * 0.5)
                                         horizontalPadding: 12
                                         contentSpacing: 8
                                         mouseArea.enabled: false
@@ -845,21 +863,7 @@ Item {
                                     y: 0
                                     width: rightNotchBar.width
                                     height: rightNotchBar.height
-                                    z: rightDragArea.pressed ? 10 : 2
-
-                                    MouseArea {
-                                        id: rightDragArea
-                                        anchors.fill: parent
-                                        cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-                                        drag.target: notchBarsContainer
-                                        drag.axis: Drag.YAxis
-                                        drag.minimumY: 0
-                                        drag.maximumY: Math.max(0, blueprintWorkspace.height - (root.centerExpanded ? 240 : root.previewNotchHeight) - 10)
-                                        onPositionChanged: {
-                                            if (pressed) root.notchBarsY = notchBarsContainer.y
-                                        }
-                                        onReleased: root.notchBarsY = notchBarsContainer.y
-                                    }
+                                    z: 2
 
                                     NotchContainer {
                                         id: rightNotchBar
@@ -870,6 +874,7 @@ Item {
                                         notchOpacity: root.previewNotchOpacity
                                         implicitHeight: root.previewNotchHeight
                                         height: root.previewNotchHeight
+                                        attachedBottom: root.notchBarsY > (root.notchMaxY * 0.5)
                                         horizontalPadding: 10
                                         contentSpacing: 8
                                         mouseArea.enabled: false
@@ -1008,29 +1013,42 @@ Item {
 
                         Item { Layout.fillWidth: true }
 
-                        // Quick Blueprint Reset Button
+                        // Interactive Dock Position Switcher Button
                         Rectangle {
                             height: 28
-                            width: resetText.implicitWidth + 24
+                            width: dockBtnRow.implicitWidth + 24
                             radius: 6
-                            color: resetMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.20)
-                            border.color: resetMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.25) : Qt.rgba(1, 1, 1, 0.10)
+                            color: dockBtnMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) : Qt.rgba(0, 0, 0, 0.25)
+                            border.color: dockBtnMouse.containsMouse ? Theme.primary : Qt.rgba(1, 1, 1, 0.12)
                             border.width: 1
 
-                            Text {
-                                id: resetText
+                            RowLayout {
+                                id: dockBtnRow
                                 anchors.centerIn: parent
-                                text: "󰑐  Dock Bars to Top"
-                                font.family: Theme.fontMono
-                                font.pixelSize: Theme.fontPx(10)
-                                color: Qt.rgba(1, 1, 1, 0.75)
+                                spacing: 6
+
+                                Text {
+                                    text: root.notchDockPosition === "top" ? "󰘕" : "󰘚"
+                                    font.family: "JetBrainsMono Nerd Font"
+                                    font.pixelSize: Theme.fontPx(11)
+                                    color: Theme.primary
+                                }
+
+                                Text {
+                                    text: root.notchDockPosition === "top" ? "Dock to Bottom Bezel" : "Dock to Top Bezel"
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: Theme.fontPx(10)
+                                    font.weight: Font.DemiBold
+                                    color: Qt.rgba(1, 1, 1, 0.85)
+                                }
                             }
 
                             MouseArea {
-                                id: resetMouse
+                                id: dockBtnMouse
                                 anchors.fill: parent
+                                hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: root.resetBarPositions()
+                                onClicked: root.toggleNotchDock()
                             }
                         }
                     }
