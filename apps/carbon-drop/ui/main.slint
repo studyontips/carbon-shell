@@ -397,8 +397,8 @@ export component MainWindow inherits Window {
                         api_uguu := Rectangle {
                             height: 30px;
                             border-radius: 15px;
-                            background: (root.active_api == "uguu.se" || root.active_api == "file.io") ? #00f0ff22 : (api_uguu_touch.has-hover ? #ffffff0d : transparent);
-                            border-width: (root.active_api == "uguu.se" || root.active_api == "file.io") ? 1px : 0px;
+                            background: root.active_api == "uguu.se" ? #00f0ff22 : (api_uguu_touch.has-hover ? #ffffff0d : transparent);
+                            border-width: root.active_api == "uguu.se" ? 1px : 0px;
                             border-color: #00f0ff55;
 
                             api_uguu_touch := TouchArea {
@@ -412,8 +412,8 @@ export component MainWindow inherits Window {
                                 padding-right: 12px;
                                 alignment: center;
                                 Text {
-                                    text: ((root.active_api == "uguu.se" || root.active_api == "file.io") ? "◆" : "◇") + " uguu.se";
-                                    color: (root.active_api == "uguu.se" || root.active_api == "file.io") ? #00f0ff : #ffffff88;
+                                    text: (root.active_api == "uguu.se" ? "◆" : "◇") + " uguu.se";
+                                    color: root.active_api == "uguu.se" ? #00f0ff : #ffffff88;
                                     font-size: 12px;
                                     font-weight: 600;
                                     vertical-alignment: center;
