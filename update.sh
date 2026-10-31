@@ -291,6 +291,7 @@ msg "Updating application launcher shortcuts..."
 mkdir -p "$HOME/.local/share/applications"
 [[ -f "$REPO_DIR/assets/carbon-settings.desktop" ]] && cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-settings.desktop"
 [[ -f "$REPO_DIR/assets/carbon-config-editor.desktop" ]] && cp -f "$REPO_DIR/assets/carbon-config-editor.desktop" "$HOME/.local/share/applications/carbon-config-editor.desktop"
+[[ -f "$REPO_DIR/assets/carbon-drop.desktop" ]] && cp -f "$REPO_DIR/assets/carbon-drop.desktop" "$HOME/.local/share/applications/carbon-drop.desktop"
 rm -f "$HOME/.local/share/applications/carbon-settings-hub.desktop" 2>/dev/null || true
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 ok "Desktop entries updated"

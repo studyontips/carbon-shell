@@ -43,6 +43,10 @@ hl.bind(mainMod .. " + comma", hl.dsp.exec_cmd(homeDir .. "/.config/carbon/scrip
 hl.bind(mainMod .. " + SHIFT + comma", hl.dsp.exec_cmd(homeDir .. "/.config/hypr/scripts/carbon-config-editor"))
 hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd(homeDir .. "/.config/carbon/scripts/carbon-settings-hub"))
 
+-- Carbon Drop (File Uploader & Downloader)
+hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd(homeDir .. "/.config/carbon/scripts/carbon-drop.sh"))
+hl.bind(mainMod .. " + D", hl.dsp.exec_cmd(homeDir .. "/.config/carbon/scripts/carbon-drop.sh"))
+
 -- Carbon Pomodoro Timer
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/carbon-pomodoro"))
 
@@ -61,9 +65,8 @@ hl.bind(mainMod .. " + right", hl.dsp.exec_cmd("hyprctl dispatch movefocus r"))
 hl.bind(mainMod .. " + up", hl.dsp.exec_cmd("hyprctl dispatch movefocus u"))
 hl.bind(mainMod .. " + down", hl.dsp.exec_cmd("hyprctl dispatch movefocus d"))
 
--- Move windows (WASD - dedicated sole movement keys)
+-- Move windows (WAS - Note: "D" is assigned to Carbon Drop)
 hl.bind(mainMod .. " + A", hl.dsp.window.move({ direction = "l" }))
-hl.bind(mainMod .. " + D", hl.dsp.window.move({ direction = "r" }))
 hl.bind(mainMod .. " + W", hl.dsp.window.move({ direction = "u" }))
 hl.bind(mainMod .. " + S", hl.dsp.window.move({ direction = "d" }))
 
