@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Carbon Drop
+GenericName=File Transfer & Streaming
+Comment=Fast streaming file uploader and downloader
+Exec=carbon-drop
+Icon=cloud-upload
+Terminal=false
+Type=Application
+Categories=Utility;Network;FileTransfer;
+StartupNotify=true
+StartupWMClass=Carbon Drop

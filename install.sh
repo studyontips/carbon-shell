@@ -199,11 +199,14 @@ info "Keybinding profile: $KEYBIND_MODE"
 
 # Deploy files to ~/.config/carbon
 msg "Deploying configuration to $CONFIG_DIR..."
-mkdir -p "$CONFIG_DIR/scripts" "$CONFIG_DIR/configs" "$HYPR_CONFIG_DIR/configs"
+mkdir -p "$CONFIG_DIR/scripts" "$CONFIG_DIR/configs" "$HYPR_CONFIG_DIR/configs" "$HYPR_CONFIG_DIR/scripts"
 echo "$REPO_DIR" > "$CONFIG_DIR/repo_path"
 
 cp -rf "$REPO_DIR/hypr/scripts/"* "$CONFIG_DIR/scripts/"
 chmod +x "$CONFIG_DIR/scripts/"* 2>/dev/null || true
+
+cp -rf "$REPO_DIR/hypr/scripts/"* "$HYPR_CONFIG_DIR/scripts/" 2>/dev/null || true
+chmod +x "$HYPR_CONFIG_DIR/scripts/"* 2>/dev/null || true
 
 cp -rf "$REPO_DIR/hypr/configs/"* "$CONFIG_DIR/configs/"
 cp -rf "$REPO_DIR/hypr/configs/"* "$HYPR_CONFIG_DIR/configs/" 2>/dev/null || true
@@ -290,11 +293,61 @@ if [[ -d "$REPO_DIR/fonts" ]]; then
     command -v fc-cache >/dev/null 2>&1 && fc-cache -f >/dev/null 2>&1 || true
 fi
 
+# Deploy desktop entries
+mkdir -p "$HOME/.local/share/applications"
+[[ -f "$REPO_DIR/assets/carbon-settings.desktop" ]] && cp -f "$REPO_DIR/assets/carbon-settings.desktop" "$HOME/.local/share/applications/carbon-settings.desktop"
+[[ -f "$REPO_DIR/assets/carbon-config-editor.desktop" ]] && cp -f "$REPO_DIR/assets/carbon-config-editor.desktop" "$HOME/.local/share/applications/carbon-config-editor.desktop"
+[[ -f "$REPO_DIR/assets/carbon-drop.desktop" ]] && cp -f "$REPO_DIR/assets/carbon-drop.desktop" "$HOME/.local/share/applications/carbon-drop.desktop"
+rm -f "$HOME/.local/share/applications/carbon-settings-hub.desktop" 2>/dev/null || true
+command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+
 # Deploy user binaries
 mkdir -p "$BIN_DIR"
 [[ -f "$REPO_DIR/update.sh" ]] && cp -f "$REPO_DIR/update.sh" "$BIN_DIR/carbon-update"
 [[ -f "$CONFIG_DIR/scripts/carbon-config-editor" ]] && cp -f "$CONFIG_DIR/scripts/carbon-config-editor" "$BIN_DIR/carbon-config-editor"
 [[ -f "$CONFIG_DIR/scripts/carbon-pomodoro" ]] && cp -f "$CONFIG_DIR/scripts/carbon-pomodoro" "$BIN_DIR/carbon-pomodoro"
+[[ -f "$CONFIG_DIR/scripts/carbon-settings-hub" ]] && cp -f "$CONFIG_DIR/scripts/carbon-settings-hub" "$BIN_DIR/carbon-settings-hub"
+
+# Carbon Settings Hub daemon (Rust)
+if [[ -d "$REPO_DIR/backend/carbon-hub-daemon" ]]; then
+    if [[ ! -f "$REPO_DIR/backend/carbon-hub-daemon/target/release/carbon-hub-daemon" ]] && command -v cargo >/dev/null 2>&1; then
+        (cd "$REPO_DIR/backend/carbon-hub-daemon" && cargo build --release --quiet) || true
+    fi
+    if [[ -f "$REPO_DIR/backend/carbon-hub-daemon/target/release/carbon-hub-daemon" ]]; then
+        cp -f "$REPO_DIR/backend/carbon-hub-daemon/target/release/carbon-hub-daemon" "$BIN_DIR/carbon-hub-daemon"
+        chmod +x "$BIN_DIR/carbon-hub-daemon"
+    fi
+    if [[ -f "$REPO_DIR/systemd/carbon-hub.service" ]]; then
+        mkdir -p "$SYSTEMD_USER_DIR"
+        cp -f "$REPO_DIR/systemd/carbon-hub.service" "$SYSTEMD_USER_DIR/"
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl --user daemon-reload >/dev/null 2>&1 || true
+            systemctl --user enable carbon-hub.service >/dev/null 2>&1 || true
+        fi
+    fi
+fi
+
+# Carbon Drop streaming engine (Rust)
+if [[ -d "$REPO_DIR/apps/carbon-drop" ]]; then
+    if [[ ! -f "$REPO_DIR/apps/carbon-drop/target/release/carbon-drop-engine" ]] && command -v cargo >/dev/null 2>&1; then
+        (cd "$REPO_DIR/apps/carbon-drop" && cargo build --release --quiet) || true
+    fi
+    if [[ -f "$REPO_DIR/apps/carbon-drop/target/release/carbon-drop-engine" ]]; then
+        cp -f "$REPO_DIR/apps/carbon-drop/target/release/carbon-drop-engine" "$BIN_DIR/carbon-drop-engine"
+        chmod +x "$BIN_DIR/carbon-drop-engine"
+    fi
+fi
+
+# Ensure carbon-drop executable launcher exists in $BIN_DIR
+cat << 'EOF' > "$BIN_DIR/carbon-drop"
+#!/usr/bin/env bash
+QML_PATH="$HOME/.local/share/quickshell/carbon/modules/CarbonDrop.qml"
+if [ ! -f "$QML_PATH" ]; then
+    QML_PATH="$HOME/.config/carbon/modules/CarbonDrop.qml"
+fi
+exec quickshell -d -p "$QML_PATH" "$@"
+EOF
+chmod +x "$BIN_DIR/carbon-drop"
 
 for s in "$CONFIG_DIR/scripts/carbon-screenshot-"*.sh; do
     if [[ -f "$s" ]]; then
