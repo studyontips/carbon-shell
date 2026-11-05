@@ -28,7 +28,9 @@ Item {
     readonly property var rawLines: (CairoLyricsService.lines && CairoLyricsService.lines.length > 0)
                                     ? CairoLyricsService.lines
                                     : LyricsService.lines
-    readonly property bool hasLyrics: hasTrack && rawLines && rawLines.length > 0
+    readonly property bool isUntimed: hasTrack && rawLines && rawLines.length > 0 && Boolean(rawLines[0] && rawLines[0].untimed === true)
+    readonly property bool hasTimedLyrics: hasTrack && rawLines && rawLines.length > 0 && !isUntimed
+    readonly property bool hasLyrics: hasTimedLyrics
 
     property var tokens: []
     property int currentTokenIndex: -1

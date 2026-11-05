@@ -36,8 +36,8 @@ Item {
         if (root.notchPage < 1) root.notchPage++
     }
 
-    implicitWidth: root.notchPage === 0 ? Theme.px(820) : Theme.px(720)
-    implicitHeight: root.notchPage === 0 ? Theme.px(270) : Theme.px(240)
+    implicitWidth: Theme.px(820)
+    implicitHeight: Theme.px(270)
     width: implicitWidth
     height: implicitHeight
     clip: false
@@ -270,10 +270,10 @@ Item {
                     anchors.fill: parent
                     spacing: Theme.px(14)
 
-                    // ── Left Column: Volume & Brightness Sliders ──
+                    // ── Left Column: Audio & Display Studio Capsules ──
                     ColumnLayout {
                         Layout.fillWidth: true
-                        Layout.preferredWidth: Theme.px(340)
+                        Layout.preferredWidth: Theme.px(380)
                         Layout.fillHeight: true
                         spacing: Theme.px(10)
 
@@ -283,11 +283,16 @@ Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             radius: Theme.px(16)
-                            color: Qt.rgba(0.04, 0.05, 0.04, 0.85)
+                            color: volCardMouse.containsMouse
+                                ? Qt.rgba(0.045, 0.05, 0.06, 0.85)
+                                : Qt.rgba(0.025, 0.03, 0.035, 0.75)
                             border.width: 1
-                            border.color: volMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35) : Qt.rgba(1, 1, 1, 0.08)
+                            border.color: (volTrackMouse.pressed || volCardMouse.containsMouse)
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
+                                : Qt.rgba(1, 1, 1, 0.07)
                             clip: true
-                            Behavior on border.color { ColorAnimation { duration: 140 } }
+                            Behavior on color { ColorAnimation { duration: 160 } }
+                            Behavior on border.color { ColorAnimation { duration: 160 } }
 
                             readonly property var sink: Pipewire.defaultAudioSink
                             readonly property real rawVol: (sink && sink.audio && sink.audio.volume !== undefined)
@@ -296,132 +301,203 @@ Item {
                                 ? sink.audio.muted : (SysBackend ? SysBackend.isMuted : false)
                             readonly property real clampedVol: Math.max(0.0, Math.min(1.0, rawVol))
 
-                            // Liquid Fill Bar with Meniscus Glow
+                            // Top edge subtle glass highlight
                             Rectangle {
-                                id: volLiquidFill
-                                anchors.left: parent.left
                                 anchors.top: parent.top
-                                anchors.bottom: parent.bottom
-                                anchors.margins: 2
-                                width: volSlider.isMuted ? 0 : Math.max(0, Math.min(parent.width - 4, (parent.width - 4) * volSlider.clampedVol))
-                                radius: Theme.px(14)
-                                gradient: Gradient {
-                                    orientation: Gradient.Horizontal
-                                    GradientStop { position: 0.0; color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) }
-                                    GradientStop { position: 1.0; color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45) }
-                                }
-                                Behavior on width { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
-
-                                Rectangle {
-                                    anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    anchors.bottom: parent.bottom
-                                    anchors.topMargin: 4
-                                    anchors.bottomMargin: 4
-                                    width: 3
-                                    radius: 1.5
-                                    color: "#FFFFFF"
-                                    visible: !volSlider.isMuted && volSlider.clampedVol > 0.02
-
-                                    Rectangle {
-                                        anchors.centerIn: parent
-                                        width: 7
-                                        height: parent.height + 4
-                                        radius: 3.5
-                                        color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
-                                        z: -1
-                                    }
-                                }
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 1
+                                color: Qt.rgba(255, 255, 255, 0.08)
                             }
 
-                            // Interactive Mute / Speaker Icon Button (Left)
-                            Rectangle {
-                                id: volMuteBtn
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: Theme.px(32)
-                                height: Theme.px(32)
-                                radius: Theme.px(16)
-                                color: volMuteMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.25) : "transparent"
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: Theme.px(12)
+                                spacing: Theme.px(8)
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: volSlider.isMuted ? "󰝟" : (volSlider.clampedVol < 0.33 ? "󰕿" : (volSlider.clampedVol < 0.66 ? "󰖀" : "󰕾"))
-                                    font.family: "JetBrainsMono Nerd Font"
-                                    font.pixelSize: 15
-                                    color: volSlider.isMuted ? Theme.fgDim : Theme.primary
-                                }
+                                // 1. Header Row
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.px(10)
 
-                                MouseArea {
-                                    id: volMuteMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        if (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) {
-                                            Pipewire.defaultAudioSink.audio.muted = !Pipewire.defaultAudioSink.audio.muted
-                                        } else {
-                                            Quickshell.execDetached(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
+                                    // Tactile Mute / Speaker Icon Button
+                                    Rectangle {
+                                        id: volMuteBtn
+                                        width: Theme.px(32)
+                                        height: Theme.px(32)
+                                        radius: Theme.px(10)
+                                        color: volSlider.isMuted
+                                            ? Qt.rgba(Theme.err.r, Theme.err.g, Theme.err.b, volMuteMouse.containsMouse ? 0.30 : 0.16)
+                                            : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, volMuteMouse.containsMouse ? 0.28 : 0.14)
+                                        border.width: 1
+                                        border.color: volSlider.isMuted
+                                            ? Qt.rgba(Theme.err.r, Theme.err.g, Theme.err.b, 0.40)
+                                            : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.30)
+                                        scale: volMuteMouse.pressed ? 0.90 : (volMuteMouse.containsMouse ? 1.05 : 1.0)
+                                        Behavior on scale { NumberAnimation { duration: 120 } }
+                                        Behavior on color { ColorAnimation { duration: 140 } }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: volSlider.isMuted ? "󰝟" : (volSlider.clampedVol < 0.33 ? "󰕿" : (volSlider.clampedVol < 0.66 ? "󰖀" : "󰕾"))
+                                            font.family: "JetBrainsMono Nerd Font"
+                                            font.pixelSize: 14
+                                            color: volSlider.isMuted ? Theme.err : Theme.primary
+                                        }
+
+                                        MouseArea {
+                                            id: volMuteMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) {
+                                                    Pipewire.defaultAudioSink.audio.muted = !Pipewire.defaultAudioSink.audio.muted
+                                                } else {
+                                                    Quickshell.execDetached(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Labels
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 1
+
+                                        Text {
+                                            text: "MASTER AUDIO"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontPx(10.5)
+                                            font.bold: true
+                                            color: Theme.fg
+                                        }
+
+                                        Text {
+                                            text: volSlider.isMuted ? "Audio muted" : (volSlider.sink && volSlider.sink.description ? volSlider.sink.description : "Default PipeWire Sink")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontPx(9)
+                                            color: Theme.fgDim
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+                                    }
+
+                                    // Right Percentage Badge
+                                    Rectangle {
+                                        width: Theme.px(54)
+                                        height: Theme.px(22)
+                                        radius: Theme.px(11)
+                                        color: volSlider.isMuted
+                                            ? Qt.rgba(Theme.err.r, Theme.err.g, Theme.err.b, 0.18)
+                                            : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.14)
+                                        border.width: 1
+                                        border.color: volSlider.isMuted
+                                            ? Qt.rgba(Theme.err.r, Theme.err.g, Theme.err.b, 0.45)
+                                            : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: volSlider.isMuted ? "MUTED" : Math.round(volSlider.clampedVol * 100) + "%"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontPx(10)
+                                            font.bold: true
+                                            color: volSlider.isMuted ? Theme.err : Theme.primary
                                         }
                                     }
                                 }
-                            }
 
-                            // Label: Volume
-                            Text {
-                                anchors.left: volMuteBtn.right
-                                anchors.leftMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "Master Volume"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontPx(11)
-                                font.weight: Font.DemiBold
-                                color: volSlider.isMuted ? Theme.fgDim : Theme.fg
-                            }
+                                Item { Layout.fillHeight: true }
 
-                            // Right Percentage Badge
-                            Rectangle {
-                                anchors.right: parent.right
-                                anchors.rightMargin: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: Theme.px(42)
-                                height: Theme.px(22)
-                                radius: Theme.px(11)
-                                color: Qt.rgba(0, 0, 0, 0.50)
+                                // 2. Track Row (Dedicated tactile groove with glowing knob)
+                                Item {
+                                    id: volTrackArea
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: Theme.px(26)
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: volSlider.isMuted ? "MUT" : Math.round(volSlider.clampedVol * 100) + "%"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontPx(10)
-                                    font.bold: true
-                                    color: volSlider.isMuted ? Theme.fgDim : "#FFFFFF"
-                                }
-                            }
+                                    // Groove Channel
+                                    Rectangle {
+                                        id: volGroove
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        height: Theme.px(10)
+                                        radius: Theme.px(5)
+                                        color: Qt.rgba(0, 0, 0, 0.65)
+                                        border.width: 1
+                                        border.color: Qt.rgba(255, 255, 255, 0.06)
+                                        clip: true
 
-                            // Interactive Scrubbing MouseArea
-                            MouseArea {
-                                id: volMouse
-                                anchors.fill: parent
-                                anchors.leftMargin: Theme.px(44)
-                                anchors.rightMargin: Theme.px(54)
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
+                                        // Active Gradient Fill
+                                        Rectangle {
+                                            id: volFill
+                                            anchors.left: parent.left
+                                            anchors.top: parent.top
+                                            anchors.bottom: parent.bottom
+                                            width: volSlider.isMuted ? 0 : Math.max(0, Math.min(parent.width, parent.width * volSlider.clampedVol))
+                                            radius: Theme.px(5)
+                                            gradient: Gradient {
+                                                orientation: Gradient.Horizontal
+                                                GradientStop { position: 0.0; color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45) }
+                                                GradientStop { position: 1.0; color: Theme.primary }
+                                            }
+                                            Behavior on width { NumberAnimation { duration: 60; easing.type: Easing.OutCubic } }
+                                        }
+                                    }
 
-                                function setVolFromX(mouseX) {
-                                    var r = Math.max(0.0, Math.min(1.0, mouseX / width))
-                                    if (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) {
-                                        Pipewire.defaultAudioSink.audio.volume = r
-                                        if (Pipewire.defaultAudioSink.audio.muted) Pipewire.defaultAudioSink.audio.muted = false
-                                    } else {
-                                        Quickshell.execDetached(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", Math.round(r * 100) + "%"])
+                                    // Glowing Thumb Knob
+                                    Rectangle {
+                                        id: volThumb
+                                        width: Theme.px(18)
+                                        height: Theme.px(18)
+                                        radius: Theme.px(9)
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        x: volSlider.isMuted ? -width : Math.max(0, Math.min(parent.width - width, (parent.width * volSlider.clampedVol) - width / 2))
+                                        color: "#FFFFFF"
+                                        scale: volTrackMouse.pressed ? 1.25 : (volTrackMouse.containsMouse ? 1.12 : 1.0)
+                                        visible: !volSlider.isMuted
+                                        Behavior on scale { NumberAnimation { duration: 110 } }
+                                        Behavior on x { NumberAnimation { duration: 60; easing.type: Easing.OutCubic } }
+
+                                        // Outer ambient glow ring
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: parent.width + 8
+                                            height: parent.height + 8
+                                            radius: width / 2
+                                            color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, (volTrackMouse.pressed || volTrackMouse.containsMouse) ? 0.45 : 0.25)
+                                            z: -1
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: volTrackMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+
+                                        function setVolFromX(mouseX) {
+                                            var r = Math.max(0.0, Math.min(1.0, mouseX / width))
+                                            if (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) {
+                                                Pipewire.defaultAudioSink.audio.volume = r
+                                                if (Pipewire.defaultAudioSink.audio.muted) Pipewire.defaultAudioSink.audio.muted = false
+                                            } else {
+                                                Quickshell.execDetached(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", Math.round(r * 100) + "%"])
+                                            }
+                                        }
+
+                                        onPressed: mouse => setVolFromX(mouse.x)
+                                        onPositionChanged: mouse => { if (pressed) setVolFromX(mouse.x) }
                                     }
                                 }
+                            }
 
-                                onPressed: mouse => setVolFromX(mouse.x)
-                                onPositionChanged: mouse => { if (pressed) setVolFromX(mouse.x) }
+                            // Card-level MouseArea for wheel scrolling & hover
+                            MouseArea {
+                                id: volCardMouse
+                                anchors.fill: parent
+                                z: -1
+                                hoverEnabled: true
                                 onWheel: wheel => {
                                     var delta = wheel.angleDelta.y > 0 ? 0.05 : -0.05
                                     var newVol = Math.max(0.0, Math.min(1.0, volSlider.clampedVol + delta))
@@ -441,122 +517,202 @@ Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             radius: Theme.px(16)
-                            color: Qt.rgba(0.04, 0.05, 0.04, 0.85)
+                            color: brightCardMouse.containsMouse
+                                ? Qt.rgba(0.045, 0.05, 0.06, 0.85)
+                                : Qt.rgba(0.025, 0.03, 0.035, 0.75)
                             border.width: 1
-                            border.color: brightMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35) : Qt.rgba(1, 1, 1, 0.08)
+                            border.color: (brightTrackMouse.pressed || brightCardMouse.containsMouse)
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
+                                : Qt.rgba(1, 1, 1, 0.07)
                             clip: true
-                            Behavior on border.color { ColorAnimation { duration: 140 } }
+                            Behavior on color { ColorAnimation { duration: 160 } }
+                            Behavior on border.color { ColorAnimation { duration: 160 } }
 
                             property int curBrightness: (SysBackend && SysBackend.lastBrightnessPct >= 0)
                                 ? SysBackend.lastBrightnessPct : 80
                             readonly property real brightRatio: Math.max(0.05, Math.min(1.0, curBrightness / 100.0))
 
-                            // Liquid Fill Bar with Meniscus Glow
+                            // Top edge subtle glass highlight
                             Rectangle {
-                                id: brightLiquidFill
-                                anchors.left: parent.left
                                 anchors.top: parent.top
-                                anchors.bottom: parent.bottom
-                                anchors.margins: 2
-                                width: Math.max(0, Math.min(parent.width - 4, (parent.width - 4) * brightSlider.brightRatio))
-                                radius: Theme.px(14)
-                                gradient: Gradient {
-                                    orientation: Gradient.Horizontal
-                                    GradientStop { position: 0.0; color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) }
-                                    GradientStop { position: 1.0; color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45) }
-                                }
-                                Behavior on width { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 1
+                                color: Qt.rgba(255, 255, 255, 0.08)
+                            }
 
-                                Rectangle {
-                                    anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    anchors.bottom: parent.bottom
-                                    anchors.topMargin: 4
-                                    anchors.bottomMargin: 4
-                                    width: 3
-                                    radius: 1.5
-                                    color: "#FFFFFF"
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: Theme.px(12)
+                                spacing: Theme.px(8)
 
+                                // 1. Header Row
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.px(10)
+
+                                    // Brightness Icon Squircle
                                     Rectangle {
-                                        anchors.centerIn: parent
-                                        width: 7
-                                        height: parent.height + 4
-                                        radius: 3.5
-                                        color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
-                                        z: -1
+                                        width: Theme.px(32)
+                                        height: Theme.px(32)
+                                        radius: Theme.px(10)
+                                        color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, brightIconMouse.containsMouse ? 0.28 : 0.14)
+                                        border.width: 1
+                                        border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.30)
+                                        scale: brightIconMouse.pressed ? 0.90 : (brightIconMouse.containsMouse ? 1.05 : 1.0)
+                                        Behavior on scale { NumberAnimation { duration: 120 } }
+                                        Behavior on color { ColorAnimation { duration: 140 } }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: brightSlider.curBrightness < 33 ? "󰃞" : (brightSlider.curBrightness < 66 ? "󰃟" : "󰃠")
+                                            font.family: "JetBrainsMono Nerd Font"
+                                            font.pixelSize: 15
+                                            color: Theme.primary
+                                        }
+
+                                        MouseArea {
+                                            id: brightIconMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                var next = brightSlider.curBrightness < 50 ? 80 : 30
+                                                brightSlider.curBrightness = next
+                                                Quickshell.execDetached(["brightnessctl", "set", next + "%", "-q"])
+                                            }
+                                        }
+                                    }
+
+                                    // Labels
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 1
+
+                                        Text {
+                                            text: "SCREEN BRIGHTNESS"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontPx(10.5)
+                                            font.bold: true
+                                            color: Theme.fg
+                                        }
+
+                                        Text {
+                                            text: "Display Backlight"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontPx(9)
+                                            color: Theme.fgDim
+                                            elide: Text.ElideRight
+                                            Layout.fillWidth: true
+                                        }
+                                    }
+
+                                    // Right Percentage Badge
+                                    Rectangle {
+                                        width: Theme.px(54)
+                                        height: Theme.px(22)
+                                        radius: Theme.px(11)
+                                        color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.14)
+                                        border.width: 1
+                                        border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: brightSlider.curBrightness + "%"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontPx(10)
+                                            font.bold: true
+                                            color: Theme.primary
+                                        }
+                                    }
+                                }
+
+                                Item { Layout.fillHeight: true }
+
+                                // 2. Track Row
+                                Item {
+                                    id: brightTrackArea
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: Theme.px(26)
+
+                                    // Groove Channel
+                                    Rectangle {
+                                        id: brightGroove
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        height: Theme.px(10)
+                                        radius: Theme.px(5)
+                                        color: Qt.rgba(0, 0, 0, 0.65)
+                                        border.width: 1
+                                        border.color: Qt.rgba(255, 255, 255, 0.06)
+                                        clip: true
+
+                                        // Active Gradient Fill
+                                        Rectangle {
+                                            id: brightFill
+                                            anchors.left: parent.left
+                                            anchors.top: parent.top
+                                            anchors.bottom: parent.bottom
+                                            width: Math.max(0, Math.min(parent.width, parent.width * brightSlider.brightRatio))
+                                            radius: Theme.px(5)
+                                            gradient: Gradient {
+                                                orientation: Gradient.Horizontal
+                                                GradientStop { position: 0.0; color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45) }
+                                                GradientStop { position: 1.0; color: Theme.primary }
+                                            }
+                                            Behavior on width { NumberAnimation { duration: 60; easing.type: Easing.OutCubic } }
+                                        }
+                                    }
+
+                                    // Glowing Thumb Knob
+                                    Rectangle {
+                                        id: brightThumb
+                                        width: Theme.px(18)
+                                        height: Theme.px(18)
+                                        radius: Theme.px(9)
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        x: Math.max(0, Math.min(parent.width - width, (parent.width * brightSlider.brightRatio) - width / 2))
+                                        color: "#FFFFFF"
+                                        scale: brightTrackMouse.pressed ? 1.25 : (brightTrackMouse.containsMouse ? 1.12 : 1.0)
+                                        Behavior on scale { NumberAnimation { duration: 110 } }
+                                        Behavior on x { NumberAnimation { duration: 60; easing.type: Easing.OutCubic } }
+
+                                        // Outer ambient glow ring
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: parent.width + 8
+                                            height: parent.height + 8
+                                            radius: width / 2
+                                            color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, (brightTrackMouse.pressed || brightTrackMouse.containsMouse) ? 0.45 : 0.25)
+                                            z: -1
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: brightTrackMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+
+                                        function setBrightFromX(mouseX) {
+                                            var pct = Math.round(Math.max(5, Math.min(100, (mouseX / width) * 100)))
+                                            brightSlider.curBrightness = pct
+                                            Quickshell.execDetached(["brightnessctl", "set", pct + "%", "-q"])
+                                        }
+
+                                        onPressed: mouse => setBrightFromX(mouse.x)
+                                        onPositionChanged: mouse => { if (pressed) setBrightFromX(mouse.x) }
                                     }
                                 }
                             }
 
-                            // Icon (Left)
-                            Rectangle {
-                                id: brightIconBox
-                                anchors.left: parent.left
-                                anchors.leftMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: Theme.px(32)
-                                height: Theme.px(32)
-                                radius: Theme.px(16)
-                                color: "transparent"
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: brightSlider.curBrightness < 33 ? "󰃞" : (brightSlider.curBrightness < 66 ? "󰃟" : "󰃠")
-                                    font.family: "JetBrainsMono Nerd Font"
-                                    font.pixelSize: 15
-                                    color: Theme.primary
-                                }
-                            }
-
-                            // Subtext Label: Brightness
-                            Text {
-                                anchors.left: brightIconBox.right
-                                anchors.leftMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "Screen Brightness"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontPx(11)
-                                font.weight: Font.DemiBold
-                                color: Theme.fg
-                            }
-
-                            // Right Percentage Badge
-                            Rectangle {
-                                anchors.right: parent.right
-                                anchors.rightMargin: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: Theme.px(42)
-                                height: Theme.px(22)
-                                radius: Theme.px(11)
-                                color: Qt.rgba(0, 0, 0, 0.50)
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: brightSlider.curBrightness + "%"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontPx(10)
-                                    font.bold: true
-                                    color: "#FFFFFF"
-                                }
-                            }
-
-                            // Interactive Scrubbing MouseArea
+                            // Card-level MouseArea for wheel scrolling & hover
                             MouseArea {
-                                id: brightMouse
+                                id: brightCardMouse
                                 anchors.fill: parent
-                                anchors.leftMargin: Theme.px(44)
-                                anchors.rightMargin: Theme.px(54)
+                                z: -1
                                 hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-
-                                function setBrightFromX(mouseX) {
-                                    var pct = Math.round(Math.max(5, Math.min(100, (mouseX / width) * 100)))
-                                    brightSlider.curBrightness = pct
-                                    Quickshell.execDetached(["brightnessctl", "set", pct + "%", "-q"])
-                                }
-
-                                onPressed: mouse => setBrightFromX(mouse.x)
-                                onPositionChanged: mouse => { if (pressed) setBrightFromX(mouse.x) }
                                 onWheel: wheel => {
                                     var delta = wheel.angleDelta.y > 0 ? 5 : -5
                                     var pct = Math.max(5, Math.min(100, brightSlider.curBrightness + delta))
@@ -570,66 +726,128 @@ Item {
                     // ── Right Column: 2x2 Quick Toggles Grid ──
                     GridLayout {
                         Layout.fillWidth: true
-                        Layout.preferredWidth: Theme.px(340)
+                        Layout.preferredWidth: Theme.px(380)
                         Layout.fillHeight: true
                         columns: 2
-                        rowSpacing: Theme.px(8)
-                        columnSpacing: Theme.px(8)
+                        rowSpacing: Theme.px(10)
+                        columnSpacing: Theme.px(10)
 
                         // ── Button 1: Wi-Fi ──
                         Rectangle {
                             id: tileWifi
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            radius: Theme.px(14)
+                            radius: Theme.px(16)
                             property bool wifiOn: true
                             property string ssid: "Connected"
                             color: tileWifi.wifiOn
-                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, wifiMouse.containsMouse ? 0.22 : 0.14)
-                                : (wifiMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.04))
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, wifiMouse.containsMouse ? 0.16 : 0.08)
+                                : (wifiMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.025, 0.03, 0.035, 0.75))
                             border.width: 1
                             border.color: tileWifi.wifiOn
-                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
-                                : Qt.rgba(1, 1, 1, 0.08)
-                            Behavior on color { ColorAnimation { duration: 130 } }
-                            Behavior on border.color { ColorAnimation { duration: 130 } }
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, wifiMouse.containsMouse ? 0.45 : 0.25)
+                                : (wifiMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.07))
+                            scale: wifiMouse.pressed ? 0.97 : (wifiMouse.containsMouse ? 1.01 : 1.0)
+                            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                            Behavior on color { ColorAnimation { duration: 140 } }
+                            Behavior on border.color { ColorAnimation { duration: 140 } }
 
-                            RowLayout {
+                            // Top glass highlight
+                            Rectangle {
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 1
+                                color: Qt.rgba(255, 255, 255, tileWifi.wifiOn ? 0.16 : 0.06)
+                            }
+
+                            ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: Theme.px(10)
-                                spacing: Theme.px(8)
+                                anchors.margins: Theme.px(12)
+                                spacing: 0
 
-                                Rectangle {
-                                    Layout.preferredWidth: Theme.px(30)
-                                    Layout.preferredHeight: Theme.px(30)
-                                    radius: Theme.px(15)
-                                    color: tileWifi.wifiOn ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
-                                    scale: wifiMouse.pressed ? 0.92 : 1.0
-                                    Behavior on scale { NumberAnimation { duration: 90 } }
+                                // Header Row: Squircle Icon + Status LED Pill
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.px(8)
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: tileWifi.wifiOn ? "󰤨" : "󰤭"
-                                        font.family: "JetBrainsMono Nerd Font"
-                                        font.pixelSize: 14
-                                        color: tileWifi.wifiOn ? "#090b0a" : Theme.fgDim
+                                    Rectangle {
+                                        width: Theme.px(34)
+                                        height: Theme.px(34)
+                                        radius: Theme.px(10)
+                                        color: tileWifi.wifiOn
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22)
+                                            : Qt.rgba(1, 1, 1, 0.05)
+                                        border.width: 1
+                                        border.color: tileWifi.wifiOn
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
+                                            : Qt.rgba(1, 1, 1, 0.08)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: tileWifi.wifiOn ? "󰤨" : "󰤭"
+                                            font.family: "JetBrainsMono Nerd Font"
+                                            font.pixelSize: 15
+                                            color: tileWifi.wifiOn ? Theme.primary : Theme.fgDim
+                                        }
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    // Micro LED Status Pill
+                                    Rectangle {
+                                        height: Theme.px(18)
+                                        radius: Theme.px(9)
+                                        width: Theme.px(42)
+                                        color: tileWifi.wifiOn
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15)
+                                            : Qt.rgba(1, 1, 1, 0.04)
+                                        border.width: 1
+                                        border.color: tileWifi.wifiOn
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.30)
+                                            : Qt.rgba(1, 1, 1, 0.07)
+
+                                        RowLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 4
+
+                                            Rectangle {
+                                                width: 5
+                                                height: 5
+                                                radius: 2.5
+                                                color: tileWifi.wifiOn ? Theme.primary : Qt.rgba(Theme.fgDim.r, Theme.fgDim.g, Theme.fgDim.b, 0.4)
+                                            }
+
+                                            Text {
+                                                text: tileWifi.wifiOn ? "ON" : "OFF"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontPx(8.5)
+                                                font.bold: true
+                                                color: tileWifi.wifiOn ? Theme.primary : Theme.fgDim
+                                            }
+                                        }
                                     }
                                 }
 
+                                Item { Layout.fillHeight: true }
+
+                                // Bottom Labels
                                 ColumnLayout {
                                     Layout.fillWidth: true
-                                    spacing: 1
+                                    spacing: 2
+
                                     Text {
                                         text: "Wi-Fi"
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontPx(11)
+                                        font.pixelSize: Theme.fontPx(11.5)
                                         font.bold: true
                                         color: Theme.fg
                                     }
+
                                     Text {
-                                        text: tileWifi.wifiOn ? tileWifi.ssid : "Off"
+                                        text: tileWifi.wifiOn ? tileWifi.ssid : "Disconnected"
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontPx(9.5)
+                                        font.pixelSize: Theme.fontPx(9)
                                         color: tileWifi.wifiOn ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70) : Theme.fgDim
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
@@ -666,54 +884,116 @@ Item {
                             id: tileBt
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            radius: Theme.px(14)
+                            radius: Theme.px(16)
                             property bool btOn: false
                             color: tileBt.btOn
-                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, btMouse.containsMouse ? 0.22 : 0.14)
-                                : (btMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.04))
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, btMouse.containsMouse ? 0.16 : 0.08)
+                                : (btMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.025, 0.03, 0.035, 0.75))
                             border.width: 1
                             border.color: tileBt.btOn
-                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
-                                : Qt.rgba(1, 1, 1, 0.08)
-                            Behavior on color { ColorAnimation { duration: 130 } }
-                            Behavior on border.color { ColorAnimation { duration: 130 } }
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, btMouse.containsMouse ? 0.45 : 0.25)
+                                : (btMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.07))
+                            scale: btMouse.pressed ? 0.97 : (btMouse.containsMouse ? 1.01 : 1.0)
+                            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                            Behavior on color { ColorAnimation { duration: 140 } }
+                            Behavior on border.color { ColorAnimation { duration: 140 } }
 
-                            RowLayout {
+                            // Top glass highlight
+                            Rectangle {
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 1
+                                color: Qt.rgba(255, 255, 255, tileBt.btOn ? 0.16 : 0.06)
+                            }
+
+                            ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: Theme.px(10)
-                                spacing: Theme.px(8)
+                                anchors.margins: Theme.px(12)
+                                spacing: 0
 
-                                Rectangle {
-                                    Layout.preferredWidth: Theme.px(30)
-                                    Layout.preferredHeight: Theme.px(30)
-                                    radius: Theme.px(15)
-                                    color: tileBt.btOn ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
-                                    scale: btMouse.pressed ? 0.92 : 1.0
-                                    Behavior on scale { NumberAnimation { duration: 90 } }
+                                // Header Row: Squircle Icon + Status LED Pill
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.px(8)
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: tileBt.btOn ? "󰂯" : "󰂲"
-                                        font.family: "JetBrainsMono Nerd Font"
-                                        font.pixelSize: 14
-                                        color: tileBt.btOn ? "#090b0a" : Theme.fgDim
+                                    Rectangle {
+                                        width: Theme.px(34)
+                                        height: Theme.px(34)
+                                        radius: Theme.px(10)
+                                        color: tileBt.btOn
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22)
+                                            : Qt.rgba(1, 1, 1, 0.05)
+                                        border.width: 1
+                                        border.color: tileBt.btOn
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
+                                            : Qt.rgba(1, 1, 1, 0.08)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: tileBt.btOn ? "󰂯" : "󰂲"
+                                            font.family: "JetBrainsMono Nerd Font"
+                                            font.pixelSize: 15
+                                            color: tileBt.btOn ? Theme.primary : Theme.fgDim
+                                        }
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    // Micro LED Status Pill
+                                    Rectangle {
+                                        height: Theme.px(18)
+                                        radius: Theme.px(9)
+                                        width: Theme.px(42)
+                                        color: tileBt.btOn
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15)
+                                            : Qt.rgba(1, 1, 1, 0.04)
+                                        border.width: 1
+                                        border.color: tileBt.btOn
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.30)
+                                            : Qt.rgba(1, 1, 1, 0.07)
+
+                                        RowLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 4
+
+                                            Rectangle {
+                                                width: 5
+                                                height: 5
+                                                radius: 2.5
+                                                color: tileBt.btOn ? Theme.primary : Qt.rgba(Theme.fgDim.r, Theme.fgDim.g, Theme.fgDim.b, 0.4)
+                                            }
+
+                                            Text {
+                                                text: tileBt.btOn ? "ON" : "OFF"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontPx(8.5)
+                                                font.bold: true
+                                                color: tileBt.btOn ? Theme.primary : Theme.fgDim
+                                            }
+                                        }
                                     }
                                 }
 
+                                Item { Layout.fillHeight: true }
+
+                                // Bottom Labels
                                 ColumnLayout {
                                     Layout.fillWidth: true
-                                    spacing: 1
+                                    spacing: 2
+
                                     Text {
                                         text: "Bluetooth"
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontPx(11)
+                                        font.pixelSize: Theme.fontPx(11.5)
                                         font.bold: true
                                         color: Theme.fg
                                     }
+
                                     Text {
-                                        text: tileBt.btOn ? "Enabled" : "Off"
+                                        text: tileBt.btOn ? "Ready / Active" : "Disabled"
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontPx(9.5)
+                                        font.pixelSize: Theme.fontPx(9)
                                         color: tileBt.btOn ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70) : Theme.fgDim
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
@@ -750,54 +1030,116 @@ Item {
                             id: tileDnd
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            radius: Theme.px(14)
+                            radius: Theme.px(16)
                             readonly property bool isDnd: NotificationService.dnd || GlobalState.doNotDisturb
                             color: tileDnd.isDnd
-                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, dndMouse.containsMouse ? 0.22 : 0.14)
-                                : (dndMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.04))
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, dndMouse.containsMouse ? 0.16 : 0.08)
+                                : (dndMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.025, 0.03, 0.035, 0.75))
                             border.width: 1
                             border.color: tileDnd.isDnd
-                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
-                                : Qt.rgba(1, 1, 1, 0.08)
-                            Behavior on color { ColorAnimation { duration: 130 } }
-                            Behavior on border.color { ColorAnimation { duration: 130 } }
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, dndMouse.containsMouse ? 0.45 : 0.25)
+                                : (dndMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.07))
+                            scale: dndMouse.pressed ? 0.97 : (dndMouse.containsMouse ? 1.01 : 1.0)
+                            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                            Behavior on color { ColorAnimation { duration: 140 } }
+                            Behavior on border.color { ColorAnimation { duration: 140 } }
 
-                            RowLayout {
+                            // Top glass highlight
+                            Rectangle {
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 1
+                                color: Qt.rgba(255, 255, 255, tileDnd.isDnd ? 0.16 : 0.06)
+                            }
+
+                            ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: Theme.px(10)
-                                spacing: Theme.px(8)
+                                anchors.margins: Theme.px(12)
+                                spacing: 0
 
-                                Rectangle {
-                                    Layout.preferredWidth: Theme.px(30)
-                                    Layout.preferredHeight: Theme.px(30)
-                                    radius: Theme.px(15)
-                                    color: tileDnd.isDnd ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
-                                    scale: dndMouse.pressed ? 0.92 : 1.0
-                                    Behavior on scale { NumberAnimation { duration: 90 } }
+                                // Header Row: Squircle Icon + Status LED Pill
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.px(8)
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: tileDnd.isDnd ? "󰂛" : "󰂚"
-                                        font.family: "JetBrainsMono Nerd Font"
-                                        font.pixelSize: 14
-                                        color: tileDnd.isDnd ? "#090b0a" : Theme.fgDim
+                                    Rectangle {
+                                        width: Theme.px(34)
+                                        height: Theme.px(34)
+                                        radius: Theme.px(10)
+                                        color: tileDnd.isDnd
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22)
+                                            : Qt.rgba(1, 1, 1, 0.05)
+                                        border.width: 1
+                                        border.color: tileDnd.isDnd
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
+                                            : Qt.rgba(1, 1, 1, 0.08)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: tileDnd.isDnd ? "󰂛" : "󰂚"
+                                            font.family: "JetBrainsMono Nerd Font"
+                                            font.pixelSize: 15
+                                            color: tileDnd.isDnd ? Theme.primary : Theme.fgDim
+                                        }
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    // Micro LED Status Pill
+                                    Rectangle {
+                                        height: Theme.px(18)
+                                        radius: Theme.px(9)
+                                        width: Theme.px(42)
+                                        color: tileDnd.isDnd
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15)
+                                            : Qt.rgba(1, 1, 1, 0.04)
+                                        border.width: 1
+                                        border.color: tileDnd.isDnd
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.30)
+                                            : Qt.rgba(1, 1, 1, 0.07)
+
+                                        RowLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 4
+
+                                            Rectangle {
+                                                width: 5
+                                                height: 5
+                                                radius: 2.5
+                                                color: tileDnd.isDnd ? Theme.primary : Qt.rgba(Theme.fgDim.r, Theme.fgDim.g, Theme.fgDim.b, 0.4)
+                                            }
+
+                                            Text {
+                                                text: tileDnd.isDnd ? "ON" : "OFF"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontPx(8.5)
+                                                font.bold: true
+                                                color: tileDnd.isDnd ? Theme.primary : Theme.fgDim
+                                            }
+                                        }
                                     }
                                 }
 
+                                Item { Layout.fillHeight: true }
+
+                                // Bottom Labels
                                 ColumnLayout {
                                     Layout.fillWidth: true
-                                    spacing: 1
+                                    spacing: 2
+
                                     Text {
                                         text: "Do Not Disturb"
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontPx(11)
+                                        font.pixelSize: Theme.fontPx(11.5)
                                         font.bold: true
                                         color: Theme.fg
                                     }
+
                                     Text {
-                                        text: tileDnd.isDnd ? "Muted" : "Alerts On"
+                                        text: tileDnd.isDnd ? "Muted / Silent" : "Alerts Active"
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontPx(9.5)
+                                        font.pixelSize: Theme.fontPx(9)
                                         color: tileDnd.isDnd ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70) : Theme.fgDim
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
@@ -826,54 +1168,116 @@ Item {
                             id: tileAppr
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            radius: Theme.px(14)
+                            radius: Theme.px(16)
                             readonly property bool isDark: (typeof Theme !== "undefined" && Theme.isDark !== undefined) ? Theme.isDark : true
                             color: tileAppr.isDark
-                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, apprMouse.containsMouse ? 0.22 : 0.14)
-                                : (apprMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.04))
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, apprMouse.containsMouse ? 0.16 : 0.08)
+                                : (apprMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0.025, 0.03, 0.035, 0.75))
                             border.width: 1
                             border.color: tileAppr.isDark
-                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
-                                : Qt.rgba(1, 1, 1, 0.08)
-                            Behavior on color { ColorAnimation { duration: 130 } }
-                            Behavior on border.color { ColorAnimation { duration: 130 } }
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, apprMouse.containsMouse ? 0.45 : 0.25)
+                                : (apprMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.07))
+                            scale: apprMouse.pressed ? 0.97 : (apprMouse.containsMouse ? 1.01 : 1.0)
+                            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                            Behavior on color { ColorAnimation { duration: 140 } }
+                            Behavior on border.color { ColorAnimation { duration: 140 } }
 
-                            RowLayout {
+                            // Top glass highlight
+                            Rectangle {
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 1
+                                color: Qt.rgba(255, 255, 255, tileAppr.isDark ? 0.16 : 0.06)
+                            }
+
+                            ColumnLayout {
                                 anchors.fill: parent
-                                anchors.margins: Theme.px(10)
-                                spacing: Theme.px(8)
+                                anchors.margins: Theme.px(12)
+                                spacing: 0
 
-                                Rectangle {
-                                    Layout.preferredWidth: Theme.px(30)
-                                    Layout.preferredHeight: Theme.px(30)
-                                    radius: Theme.px(15)
-                                    color: tileAppr.isDark ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
-                                    scale: apprMouse.pressed ? 0.92 : 1.0
-                                    Behavior on scale { NumberAnimation { duration: 90 } }
+                                // Header Row: Squircle Icon + Status LED Pill
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Theme.px(8)
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: tileAppr.isDark ? "󰖔" : "󰖙"
-                                        font.family: "JetBrainsMono Nerd Font"
-                                        font.pixelSize: 14
-                                        color: tileAppr.isDark ? "#090b0a" : Theme.fgDim
+                                    Rectangle {
+                                        width: Theme.px(34)
+                                        height: Theme.px(34)
+                                        radius: Theme.px(10)
+                                        color: tileAppr.isDark
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22)
+                                            : Qt.rgba(1, 1, 1, 0.05)
+                                        border.width: 1
+                                        border.color: tileAppr.isDark
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
+                                            : Qt.rgba(1, 1, 1, 0.08)
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: tileAppr.isDark ? "󰖔" : "󰖙"
+                                            font.family: "JetBrainsMono Nerd Font"
+                                            font.pixelSize: 15
+                                            color: tileAppr.isDark ? Theme.primary : Theme.fgDim
+                                        }
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    // Micro LED Status Pill
+                                    Rectangle {
+                                        height: Theme.px(18)
+                                        radius: Theme.px(9)
+                                        width: Theme.px(42)
+                                        color: tileAppr.isDark
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15)
+                                            : Qt.rgba(1, 1, 1, 0.04)
+                                        border.width: 1
+                                        border.color: tileAppr.isDark
+                                            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.30)
+                                            : Qt.rgba(1, 1, 1, 0.07)
+
+                                        RowLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 4
+
+                                            Rectangle {
+                                                width: 5
+                                                height: 5
+                                                radius: 2.5
+                                                color: tileAppr.isDark ? Theme.primary : Qt.rgba(Theme.fgDim.r, Theme.fgDim.g, Theme.fgDim.b, 0.4)
+                                            }
+
+                                            Text {
+                                                text: tileAppr.isDark ? "DARK" : "LITE"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontPx(8.5)
+                                                font.bold: true
+                                                color: tileAppr.isDark ? Theme.primary : Theme.fgDim
+                                            }
+                                        }
                                     }
                                 }
 
+                                Item { Layout.fillHeight: true }
+
+                                // Bottom Labels
                                 ColumnLayout {
                                     Layout.fillWidth: true
-                                    spacing: 1
+                                    spacing: 2
+
                                     Text {
-                                        text: "Theme"
+                                        text: "Theme Mode"
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontPx(11)
+                                        font.pixelSize: Theme.fontPx(11.5)
                                         font.bold: true
                                         color: Theme.fg
                                     }
+
                                     Text {
-                                        text: tileAppr.isDark ? "Dark Modern" : "Light Aura"
+                                        text: tileAppr.isDark ? "Dark Cyber" : "Light Porcelain"
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontPx(9.5)
+                                        font.pixelSize: Theme.fontPx(9)
                                         color: tileAppr.isDark ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70) : Theme.fgDim
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
@@ -898,6 +1302,7 @@ Item {
             }
 
             /* ============================================================= */
+            /* ============================================================= */
             /* PAGE 0: DEFAULT MEDIA & TACTICAL CHRONOMETER                  */
             /* ============================================================= */
             Item {
@@ -913,32 +1318,13 @@ Item {
 
                 RowLayout {
                     anchors.fill: parent
-                    spacing: Theme.px(12)
+                    spacing: Theme.px(14)
 
-                    // 1. LEFT COLUMN: TACTICAL POMODORO
-                    Item {
-                        id: timelineCol
-                        Layout.preferredWidth: Theme.px(240)
-                        Layout.fillHeight: true
-                        clip: true
-
-                        TacticalPomodoro {
-                            anchors.fill: parent
-                        }
-                    }
-
-                    // Vertical Divider 1
-                    Rectangle {
-                        Layout.fillHeight: true
-                        width: 1
-                        color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
-                    }
-
-                    // 2. CENTER COLUMN: ANIMATED TACTICAL CHRONOMETER
+                    // 1. LEFT COLUMN: ANIMATED TACTICAL CHRONOMETER
                     Item {
                         id: centerCol
                         Layout.fillWidth: true
-                        Layout.preferredWidth: Theme.px(288)
+                        Layout.preferredWidth: Theme.px(360)
                         Layout.fillHeight: true
                         clip: true
 
@@ -949,37 +1335,38 @@ Item {
                         }
                     }
 
-                    // Vertical Divider 2
+                    // Vertical Divider
                     Rectangle {
                         Layout.fillHeight: true
                         width: 1
                         color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
                     }
 
-                    // 3. RIGHT COLUMN: MEDIA PLAYER & LYRICS STREAM
+                    // 2. RIGHT COLUMN: MEDIA PLAYER & KINETIC CAIRO LYRICS
                     Item {
                         id: rightCol
-                        Layout.preferredWidth: Theme.px(240)
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: Theme.px(420)
                         Layout.fillHeight: true
 
                         ColumnLayout {
                             anchors.fill: parent
-                            spacing: Theme.px(6)
+                            spacing: Theme.px(8)
 
-                            // Track Title, Artist & Art
+                            // Track Header Row (Title, Artist & Album Art)
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: Theme.px(8)
+                                spacing: Theme.px(10)
 
                                 ColumnLayout {
                                     Layout.fillWidth: true
-                                    spacing: 1
+                                    spacing: 2
 
                                     Text {
                                         Layout.fillWidth: true
-                                        text: LyricsService.hasTrack ? LyricsService.trackTitle : "No Media"
+                                        text: LyricsService.hasTrack ? LyricsService.trackTitle : "No Media Active"
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontPx(11)
+                                        font.pixelSize: Theme.fontPx(12.5)
                                         font.weight: Font.Bold
                                         color: Theme.fg
                                         elide: Text.ElideRight
@@ -987,21 +1374,21 @@ Item {
 
                                     Text {
                                         Layout.fillWidth: true
-                                        text: LyricsService.hasTrack ? (LyricsService.trackArtist || "Unknown Artist") : "Standby"
+                                        text: LyricsService.hasTrack ? (LyricsService.trackArtist + (LyricsService.trackAlbum ? " • " + LyricsService.trackAlbum : "")) : "Standby // No Media"
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontPx(8.5)
+                                        font.pixelSize: Theme.fontPx(9.5)
                                         font.weight: Font.Medium
-                                        color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.50)
+                                        color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.55)
                                         elide: Text.ElideRight
                                     }
                                 }
 
                                 Rectangle {
-                                    width: Theme.px(30)
-                                    height: Theme.px(30)
-                                    radius: Theme.px(8)
+                                    width: Theme.px(36)
+                                    height: Theme.px(36)
+                                    radius: Theme.px(10)
                                     color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.90)
-                                    border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
+                                    border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
                                     border.width: 1
                                     clip: true
 
@@ -1017,28 +1404,30 @@ Item {
                                         visible: !LyricsService.hasTrack || !LyricsService.artUrl || LyricsService.artUrl.length === 0
                                         text: "music_note"
                                         font.family: Theme.fontIcon
-                                        font.pixelSize: 14
+                                        font.pixelSize: 16
                                         color: Theme.primary
                                     }
                                 }
                             }
 
-                            // Dynamic Visualizer / Lyrics
+                            // Dynamic Lyrics Engine: MiniCairo (Default / Timed) or ListView (Untimed Fallback Only)
                             Item {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 clip: true
 
                                 MiniCairo {
-                                    anchors.centerIn: parent
-                                    visible: !LyricsService.hasTrack || !LyricsService.lines || LyricsService.lines.length === 0
+                                    id: miniCairo
+                                    anchors.fill: parent
+                                    active: root.open && root.notchPage === 0
+                                    visible: !miniCairo.isUntimed
                                 }
 
                                 ListView {
                                     id: lyricsList
                                     anchors.fill: parent
-                                    visible: LyricsService.hasTrack && LyricsService.lines && LyricsService.lines.length > 0
-                                    model: LyricsService.lines || []
+                                    visible: miniCairo.isUntimed
+                                    model: miniCairo.rawLines || []
                                     clip: true
                                     spacing: 4
                                     preferredHighlightBegin: parent.height * 0.40
@@ -1046,11 +1435,11 @@ Item {
                                     highlightRangeMode: ListView.ApplyRange
 
                                     currentIndex: {
-                                        if (!LyricsService.lines || LyricsService.lines.length === 0) return 0
+                                        if (!miniCairo.rawLines || miniCairo.rawLines.length === 0) return 0
                                         var pos = LyricsService.currentPosition
                                         var idx = 0
-                                        for (var i = 0; i < LyricsService.lines.length; i++) {
-                                            if (LyricsService.lines[i].time <= pos) idx = i
+                                        for (var i = 0; i < miniCairo.rawLines.length; i++) {
+                                            if (miniCairo.rawLines[i].time <= pos) idx = i
                                             else break
                                         }
                                         return idx
@@ -1064,10 +1453,10 @@ Item {
                                         Text {
                                             id: lyricText
                                             anchors.centerIn: parent
-                                            width: parent.width - 8
+                                            width: parent.width - 16
                                             text: modelData.text || ""
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: isCurrent ? Theme.fontPx(11) : Theme.fontPx(9.5)
+                                            font.pixelSize: isCurrent ? Theme.fontPx(11.5) : Theme.fontPx(9.5)
                                             font.weight: isCurrent ? Font.Bold : Font.Normal
                                             color: isCurrent ? Theme.primary : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.40)
                                             horizontalAlignment: Text.AlignHCenter
@@ -1095,7 +1484,7 @@ Item {
 
                                 // Prev
                                 Rectangle {
-                                    width: 20; height: 20; radius: 10
+                                    width: Theme.px(22); height: Theme.px(22); radius: Theme.px(11)
                                     color: prevM.containsMouse ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.12) : "transparent"
                                     Text {
                                         anchors.centerIn: parent
@@ -1115,7 +1504,7 @@ Item {
 
                                 // Play / Pause
                                 Rectangle {
-                                    width: 22; height: 22; radius: 11
+                                    width: Theme.px(24); height: Theme.px(24); radius: Theme.px(12)
                                     color: playM.containsMouse ? Theme.primary : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20)
                                     Text {
                                         anchors.centerIn: parent
@@ -1135,7 +1524,7 @@ Item {
 
                                 // Next
                                 Rectangle {
-                                    width: 20; height: 20; radius: 10
+                                    width: Theme.px(22); height: Theme.px(22); radius: Theme.px(11)
                                     color: nextM.containsMouse ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.12) : "transparent"
                                     Text {
                                         anchors.centerIn: parent
