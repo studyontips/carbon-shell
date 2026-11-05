@@ -228,26 +228,75 @@ NotchContainer {
                     NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
                 }
 
-                /* 1. Center Island Clock (Dynamic Design - Click to toggle Dashboard) */
-                Item {
-            anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: centerClockItem.implicitWidth
-            implicitHeight: centerClockItem.implicitHeight
-            visible: root.barContent !== "music"
-            z: 10
+                /* 1. Center Island Clock & Notification / DND Indicator */
+                Row {
+                    id: clockWithIndicatorRow
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.px(6)
+                    visible: root.barContent !== "music"
+                    z: 10
 
-            CenterClock {
-                id: centerClockItem
-                anchors.centerIn: parent
-            }
+                    /* Notification Dot / DND Indicator (Left side of Clock) */
+                    Item {
+                        id: notchNotifIndicator
+                        anchors.verticalCenter: parent.verticalCenter
+                        readonly property bool isDnd: NotificationService.dnd || GlobalState.doNotDisturb
+                        readonly property bool hasNotifs: root.unreadNotifCount > 0
+                        visible: isDnd || hasNotifs
+                        implicitWidth: visible ? (isDnd ? Theme.px(16) : Theme.px(8)) : 0
+                        implicitHeight: Theme.px(16)
 
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.toggleCenterDashboard()
-            }
-        }
+                        Behavior on implicitWidth {
+                            NumberAnimation { duration: 180; easing.type: Easing.OutQuad }
+                        }
+
+                        // DND Icon: replaces dot when DND is on
+                        Text {
+                            anchors.centerIn: parent
+                            visible: notchNotifIndicator.isDnd
+                            text: "notifications_off"
+                            font.family: Theme.fontIcon
+                            font.pixelSize: Theme.fontPx(13.5)
+                            color: Theme.primary
+                        }
+
+                        // Simple dot: only a dot, no digit
+                        Rectangle {
+                            anchors.centerIn: parent
+                            visible: !notchNotifIndicator.isDnd && notchNotifIndicator.hasNotifs
+                            width: Theme.px(6)
+                            height: Theme.px(6)
+                            radius: Theme.px(3)
+                            color: Theme.primary
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.openSpatialControlDeck()
+                        }
+                    }
+
+                    /* Center Island Clock (Click to toggle Dashboard) */
+                    Item {
+                        implicitWidth: centerClockItem.implicitWidth
+                        implicitHeight: centerClockItem.implicitHeight
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        CenterClock {
+                            id: centerClockItem
+                            anchors.centerIn: parent
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.toggleCenterDashboard()
+                        }
+                    }
+                }
 
         /* 2. Vertical Divider */
         Rectangle {
@@ -479,59 +528,6 @@ NotchContainer {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.openSpatialControlDeck()
-            }
-        }
-
-        /* 5. Unread Indicator Dot / Badge (When Idle) */
-        Item {
-            id: notchUnreadBadge
-            anchors.verticalCenter: parent.verticalCenter
-            implicitHeight: Theme.px(20)
-            implicitWidth: unreadBadgeRow.implicitWidth + Theme.px(10)
-            visible: !root.showNotchToast && root.unreadNotifCount > 0
-            opacity: visible ? 1.0 : 0.0
-
-            Behavior on opacity {
-                NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: Theme.px(10)
-                color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.12)
-                border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
-                border.width: 1
-
-                Row {
-                    id: unreadBadgeRow
-                    anchors.centerIn: parent
-                    spacing: Theme.px(3)
-
-                    Text {
-                        text: "•"
-                        font.family: Theme.fontMono || "monospace"
-                        font.pixelSize: Theme.fontPx(12)
-                        font.bold: true
-                        color: Theme.primary
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    Text {
-                        text: String(root.unreadNotifCount)
-                        font.family: Theme.fontMono || "monospace"
-                        font.pixelSize: Theme.fontPx(10)
-                        font.bold: true
-                        color: Theme.primary
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.openSpatialControlDeck()
-                }
             }
         }
     }

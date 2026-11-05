@@ -89,7 +89,10 @@ Singleton {
         blockLoading: true
         printErrors: false
         onLoaded: root.reloadNotifConfig()
-        onFileChanged: root.reloadNotifConfig()
+        onFileChanged: {
+            reload()
+            root.reloadNotifConfig()
+        }
     }
 
     FileView {
@@ -99,21 +102,30 @@ Singleton {
         blockLoading: true
         printErrors: false
         onLoaded: root.reloadNotifConfig()
-        onFileChanged: root.reloadNotifConfig()
+        onFileChanged: {
+            reload()
+            root.reloadNotifConfig()
+        }
     }
 
     function reloadNotifConfig() {
         if (Date.now() - root._lastWriteTime < 1500)
             return
         try {
+            notifConfigFile.reload()
             var txt = notifConfigFile.text()
-            if (!txt || txt.trim().length === 0) txt = hyprNotifConfigFile.text()
+            if (!txt || txt.trim().length === 0) {
+                hyprNotifConfigFile.reload()
+                txt = hyprNotifConfigFile.text()
+            }
             if (!txt || txt.trim().length === 0) return
             var d = JSON.parse(txt)
             if (d.enabled !== undefined) root.notificationsEnabled = Boolean(d.enabled)
             if (d.dnd !== undefined && Boolean(d.dnd) !== root.dnd) {
                 root._loadingConfig = true
                 root.dnd = Boolean(d.dnd)
+                Theme.dnd = root.dnd
+                GlobalState.doNotDisturb = root.dnd
                 root._loadingConfig = false
             }
             if (d.timeout !== undefined) root.toastTimeoutMs = Math.max(1000, (parseInt(d.timeout) || 5) * 1000)
@@ -432,6 +444,7 @@ Singleton {
     }
 
     Component.onCompleted: {
+        root.reloadNotifConfig()
         root.reclassifyAll()
     }
 }

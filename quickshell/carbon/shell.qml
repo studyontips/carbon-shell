@@ -1510,7 +1510,9 @@ ShellRoot {
             notification.tracked = true
             NotificationService.addNotification(notification)
             if (root.barMode === "minimal" || root.barMode === "minimal_notch") {
-                root.showTideNotificationAll(notification.appName || "Notification", notification.summary || "", notification.body || "")
+                if (!NotificationService.dnd && !GlobalState.doNotDisturb) {
+                    root.showTideNotificationAll(notification.appName || "Notification", notification.summary || "", notification.body || "")
+                }
             }
         }
     }
