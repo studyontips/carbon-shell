@@ -2396,7 +2396,7 @@ PanelWindow {
                         readonly property bool isCurrentTarget: (spatialCanvasWindow.activeGridX === cardNode0_1.nodeX && spatialCanvasWindow.activeGridY === cardNode0_1.nodeY)
                         readonly property string cardIcon: "power_settings_new"
                         readonly property string cardTitle: "System Control Deck"
-                        readonly property string cardSubtitle: "MPRIS Media Mixer, Audio Output & Session Power"
+                        readonly property string cardSubtitle: "MPRIS Media Mixer, Notifications Log & Session Power"
 
                         width: viewport.cardWidth
                         height: viewport.cardHeight
@@ -2456,27 +2456,27 @@ PanelWindow {
                             anchors.fill: parent; anchors.margins: Theme.px(16); anchors.topMargin: Theme.px(48); clip: true; z: 2
 
                             RowLayout {
-                                anchors.fill: parent; spacing: Theme.px(16)
+                                anchors.fill: parent; spacing: Theme.px(14)
 
-                                // ─── LEFT PANE (52%): MPRIS Media Mixer & Volume ───
+                                // ─── COLUMN 1 (32%): Media & Audio Mixer ───
                                 ColumnLayout {
-                                    Layout.preferredWidth: 52; Layout.fillWidth: true; Layout.fillHeight: true; spacing: Theme.px(12)
+                                    Layout.preferredWidth: 32; Layout.fillWidth: true; Layout.fillHeight: true; spacing: Theme.px(10)
 
                                     // MPRIS Hero Card
                                     Rectangle {
-                                        Layout.fillWidth: true; Layout.fillHeight: true; radius: Theme.px(10)
+                                        Layout.fillWidth: true; Layout.fillHeight: true; radius: Theme.px(12)
                                         color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08)
                                         border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20); border.width: 1
 
                                         ColumnLayout {
-                                            anchors.fill: parent; anchors.margins: Theme.px(14); spacing: Theme.px(12)
+                                            anchors.fill: parent; anchors.margins: Theme.px(12); spacing: Theme.px(10)
 
                                             RowLayout {
-                                                Layout.fillWidth: true; spacing: Theme.px(14)
+                                                Layout.fillWidth: true; spacing: Theme.px(10)
 
-                                                // Album art
+                                                // Album art (compact 68x68 for 32% ratio)
                                                 Rectangle {
-                                                    Layout.preferredWidth: Theme.px(90); Layout.preferredHeight: Theme.px(90); radius: Theme.px(8)
+                                                    Layout.preferredWidth: Theme.px(68); Layout.preferredHeight: Theme.px(68); radius: Theme.px(8)
                                                     color: "#08090d"; border.color: Qt.rgba(255, 255, 255, 0.12); border.width: 1; clip: true
 
                                                     Image {
@@ -2487,48 +2487,48 @@ PanelWindow {
                                                     Text {
                                                         anchors.centerIn: parent
                                                         visible: !spatialCanvasWindow.activeMprisPlayer || !spatialCanvasWindow.activeMprisPlayer.trackArtUrl
-                                                        text: "music_note"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(32); color: Theme.primary
+                                                        text: "music_note"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(28); color: Theme.primary
                                                     }
                                                 }
 
                                                 // Details
                                                 ColumnLayout {
-                                                    Layout.fillWidth: true; spacing: Theme.px(4)
+                                                    Layout.fillWidth: true; spacing: Theme.px(3)
                                                     Text {
                                                         Layout.fillWidth: true
                                                         text: (spatialCanvasWindow.activeMprisPlayer && spatialCanvasWindow.activeMprisPlayer.trackTitle) ? spatialCanvasWindow.activeMprisPlayer.trackTitle : "No Media Playing"
-                                                        font.family: Theme.font; font.pixelSize: Theme.fontPx(13.5); font.bold: true; color: Theme.fg; elide: Text.ElideRight
+                                                        font.family: Theme.font; font.pixelSize: Theme.fontPx(12); font.bold: true; color: Theme.fg; elide: Text.ElideRight
                                                     }
                                                     Text {
                                                         Layout.fillWidth: true
                                                         text: (spatialCanvasWindow.activeMprisPlayer && spatialCanvasWindow.activeMprisPlayer.trackArtist) ? spatialCanvasWindow.activeMprisPlayer.trackArtist : "MPRIS Audio Service"
-                                                        font.family: Theme.font; font.pixelSize: Theme.fontPx(10.5); color: Theme.fgDim; elide: Text.ElideRight
+                                                        font.family: Theme.font; font.pixelSize: Theme.fontPx(10); color: Theme.fgDim; elide: Text.ElideRight
                                                     }
                                                     Text {
                                                         text: (spatialCanvasWindow.activeMprisPlayer && spatialCanvasWindow.activeMprisPlayer.identity) ? spatialCanvasWindow.activeMprisPlayer.identity : "PipeWire Audio"
-                                                        font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(8.5); color: Theme.primary
+                                                        font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(8); color: Theme.primary
                                                     }
                                                 }
                                             }
 
                                             // Media Controls
                                             RowLayout {
-                                                Layout.alignment: Qt.AlignHCenter; spacing: Theme.px(16)
+                                                Layout.alignment: Qt.AlignHCenter; spacing: Theme.px(14)
 
                                                 // Prev
                                                 Rectangle {
-                                                    width: Theme.px(34); height: Theme.px(34); radius: Theme.px(17); color: Qt.rgba(255, 255, 255, 0.06)
+                                                    width: Theme.px(32); height: Theme.px(32); radius: Theme.px(16); color: Qt.rgba(255, 255, 255, 0.06)
                                                     HoverHandler { id: mPrevHov }
                                                     MouseArea {
                                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                         onClicked: if (spatialCanvasWindow.activeMprisPlayer) spatialCanvasWindow.activeMprisPlayer.previous()
                                                     }
-                                                    Text { anchors.centerIn: parent; text: "skip_previous"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(18); color: mPrevHov.hovered ? Theme.primary : Theme.fg }
+                                                    Text { anchors.centerIn: parent; text: "skip_previous"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(16); color: mPrevHov.hovered ? Theme.primary : Theme.fg }
                                                 }
 
                                                 // Play / Pause
                                                 Rectangle {
-                                                    width: Theme.px(44); height: Theme.px(44); radius: Theme.px(22); color: Theme.primary
+                                                    width: Theme.px(40); height: Theme.px(40); radius: Theme.px(20); color: Theme.primary
                                                     HoverHandler { id: mPlayHov }
                                                     MouseArea {
                                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
@@ -2537,19 +2537,19 @@ PanelWindow {
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: (spatialCanvasWindow.activeMprisPlayer && spatialCanvasWindow.activeMprisPlayer.playbackState === MprisPlaybackState.Playing) ? "pause" : "play_arrow"
-                                                        font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(24); color: "#000"
+                                                        font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(22); color: "#000"
                                                     }
                                                 }
 
                                                 // Next
                                                 Rectangle {
-                                                    width: Theme.px(34); height: Theme.px(34); radius: Theme.px(17); color: Qt.rgba(255, 255, 255, 0.06)
+                                                    width: Theme.px(32); height: Theme.px(32); radius: Theme.px(16); color: Qt.rgba(255, 255, 255, 0.06)
                                                     HoverHandler { id: mNextHov }
                                                     MouseArea {
                                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                         onClicked: if (spatialCanvasWindow.activeMprisPlayer) spatialCanvasWindow.activeMprisPlayer.next()
                                                     }
-                                                    Text { anchors.centerIn: parent; text: "skip_next"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(18); color: mNextHov.hovered ? Theme.primary : Theme.fg }
+                                                    Text { anchors.centerIn: parent; text: "skip_next"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(16); color: mNextHov.hovered ? Theme.primary : Theme.fg }
                                                 }
                                             }
 
@@ -2560,7 +2560,7 @@ PanelWindow {
                                                 Layout.fillWidth: true; spacing: Theme.px(8)
 
                                                 Rectangle {
-                                                    width: Theme.px(30); height: Theme.px(30); radius: Theme.px(6)
+                                                    width: Theme.px(28); height: Theme.px(28); radius: Theme.px(6)
                                                     color: volMuteHov.hovered ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20) : Qt.rgba(255, 255, 255, 0.05)
                                                     HoverHandler { id: volMuteHov }
                                                     MouseArea {
@@ -2570,7 +2570,7 @@ PanelWindow {
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: spatialCanvasWindow.masterOutputMuted ? "volume_off" : (spatialCanvasWindow.masterOutputVolume > 0.5 ? "volume_up" : "volume_down")
-                                                        font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(16)
+                                                        font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(15)
                                                         color: spatialCanvasWindow.masterOutputMuted ? Theme.err : Theme.primary
                                                     }
                                                 }
@@ -2578,6 +2578,7 @@ PanelWindow {
                                                 Rectangle {
                                                     id: volSliderTrack
                                                     Layout.fillWidth: true; height: Theme.px(6); radius: Theme.px(3); color: Qt.rgba(255, 255, 255, 0.10)
+
                                                     Rectangle {
                                                         height: parent.height; radius: parent.radius
                                                         width: Math.round(parent.width * spatialCanvasWindow.masterOutputVolume)
@@ -2586,28 +2587,253 @@ PanelWindow {
                                                     MouseArea {
                                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                         onClicked: (mouse) => {
-                                                            var pct = Math.max(0.0, Math.min(1.0, mouse.x / width));
-                                                            spatialCanvasWindow.setMasterVolume(pct);
+                                                            var pct = Math.max(0.0, Math.min(1.0, mouse.x / width))
+                                                            spatialCanvasWindow.setMasterVolume(pct)
                                                         }
                                                     }
                                                 }
 
                                                 Text {
                                                     text: Math.round(spatialCanvasWindow.masterOutputVolume * 100) + "%"
-                                                    font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(9.5); font.bold: true; color: Theme.fg
+                                                    font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(9); font.bold: true; color: Theme.fg
                                                 }
                                             }
                                         }
                                     }
                                 }
 
-                                // ─── RIGHT PANE (48%): Clock, Uptime & 4 Power Tiles ───
+                                // ─── COLUMN 2 (36%): Live Notification Log & DND ───
                                 ColumnLayout {
-                                    Layout.preferredWidth: 48; Layout.fillWidth: true; Layout.fillHeight: true; spacing: Theme.px(10)
+                                    Layout.preferredWidth: 36; Layout.fillWidth: true; Layout.fillHeight: true; spacing: Theme.px(8)
+
+                                    // Notifications Container Card
+                                    Rectangle {
+                                        Layout.fillWidth: true; Layout.fillHeight: true; radius: Theme.px(12)
+                                        color: Qt.rgba(14/255, 16/255, 24/255, 0.85)
+                                        border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22); border.width: 1
+                                        clip: true
+
+                                        ColumnLayout {
+                                            anchors.fill: parent; anchors.margins: Theme.px(12); spacing: Theme.px(10)
+
+                                            // ── Header Bar ──
+                                            RowLayout {
+                                                Layout.fillWidth: true; spacing: Theme.px(8)
+
+                                                Text {
+                                                    text: "notifications"
+                                                    font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(16); color: Theme.primary
+                                                }
+
+                                                Text {
+                                                    text: "Notifications"
+                                                    font.family: Theme.font; font.pixelSize: Theme.fontPx(12.5); font.bold: true; color: Theme.fg
+                                                }
+
+                                                // Unread count pill
+                                                Rectangle {
+                                                    visible: NotificationService.unreadCount > 0
+                                                    Layout.preferredHeight: Theme.px(18); Layout.preferredWidth: notifCountText.implicitWidth + Theme.px(10); radius: Theme.px(9)
+                                                    color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20)
+                                                    border.color: Theme.primary; border.width: 1
+
+                                                    Text {
+                                                        id: notifCountText
+                                                        anchors.centerIn: parent
+                                                        text: NotificationService.unreadCount + " NEW"
+                                                        font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(8.5); font.bold: true; color: Theme.primary
+                                                    }
+                                                }
+
+                                                Item { Layout.fillWidth: true }
+
+                                                // [ DND ] Toggle Pill
+                                                Rectangle {
+                                                    Layout.preferredHeight: Theme.px(22); Layout.preferredWidth: dndPillText.implicitWidth + Theme.px(14); radius: Theme.px(11)
+                                                    color: (NotificationService.dnd || GlobalState.doNotDisturb) ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.25) : (dndHov.hovered ? Qt.rgba(255, 255, 255, 0.08) : Qt.rgba(255, 255, 255, 0.04))
+                                                    border.color: (NotificationService.dnd || GlobalState.doNotDisturb) ? Theme.primary : Qt.rgba(255, 255, 255, 0.12)
+                                                    border.width: 1
+                                                    HoverHandler { id: dndHov }
+                                                    MouseArea {
+                                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                        onClicked: NotificationService.toggleDnd()
+                                                    }
+                                                    Text {
+                                                        id: dndPillText
+                                                        anchors.centerIn: parent
+                                                        text: (NotificationService.dnd || GlobalState.doNotDisturb) ? "DND ON" : "DND"
+                                                        font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(9); font.bold: true
+                                                        color: (NotificationService.dnd || GlobalState.doNotDisturb) ? Theme.primary : Theme.fgDim
+                                                    }
+                                                }
+
+                                                // [ Clear All ] Button
+                                                Rectangle {
+                                                    visible: NotificationService.list.length > 0
+                                                    Layout.preferredHeight: Theme.px(22); Layout.preferredWidth: clearAllText.implicitWidth + Theme.px(14); radius: Theme.px(11)
+                                                    color: clearAllHov.hovered ? Qt.rgba(Theme.err.r, Theme.err.g, Theme.err.b, 0.20) : Qt.rgba(255, 255, 255, 0.04)
+                                                    border.color: clearAllHov.hovered ? Theme.err : Qt.rgba(255, 255, 255, 0.12); border.width: 1
+                                                    HoverHandler { id: clearAllHov }
+                                                    MouseArea {
+                                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                        onClicked: NotificationService.clearAll()
+                                                    }
+                                                    Text {
+                                                        id: clearAllText
+                                                        anchors.centerIn: parent
+                                                        text: "Clear All"
+                                                        font.family: Theme.font; font.pixelSize: Theme.fontPx(9); font.bold: true
+                                                        color: clearAllHov.hovered ? Theme.err : Theme.fgDim
+                                                    }
+                                                }
+                                            }
+
+                                            // ── Empty State ──
+                                            Item {
+                                                Layout.fillWidth: true; Layout.fillHeight: true
+                                                visible: NotificationService.list.length === 0
+
+                                                ColumnLayout {
+                                                    anchors.centerIn: parent; spacing: Theme.px(6)
+
+                                                    Rectangle {
+                                                        Layout.alignment: Qt.AlignHCenter
+                                                        width: Theme.px(42); height: Theme.px(42); radius: Theme.px(21)
+                                                        color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08)
+                                                        border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22); border.width: 1
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: "notifications_off"
+                                                            font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(20); color: Theme.primary
+                                                        }
+                                                    }
+
+                                                    Text {
+                                                        Layout.alignment: Qt.AlignHCenter
+                                                        text: "No active notifications"
+                                                        font.family: Theme.font; font.pixelSize: Theme.fontPx(11.5); font.bold: true; color: Theme.fgDim
+                                                    }
+
+                                                    Text {
+                                                        Layout.alignment: Qt.AlignHCenter
+                                                        text: "SYSTEM // QUIET LOG"
+                                                        font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(8.5); color: Qt.rgba(Theme.fgDim.r, Theme.fgDim.g, Theme.fgDim.b, 0.45)
+                                                    }
+                                                }
+                                            }
+
+                                            // ── Scrollable Notification List ──
+                                            ListView {
+                                                id: notifListView
+                                                Layout.fillWidth: true; Layout.fillHeight: true
+                                                visible: NotificationService.list.length > 0
+                                                clip: true; spacing: Theme.px(8); boundsBehavior: Flickable.StopAtBounds
+                                                model: NotificationService.list
+
+                                                delegate: Rectangle {
+                                                    id: notifCard
+                                                    required property var modelData
+                                                    required property int index
+
+                                                    width: notifListView.width
+                                                    implicitHeight: notifCardCol.implicitHeight + Theme.px(16)
+                                                    radius: Theme.px(12)
+                                                    color: Qt.rgba(1, 1, 1, 0.04)
+                                                    border.color: notifCardHov.hovered ? Theme.primary : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.16)
+                                                    border.width: 1
+
+                                                    HoverHandler { id: notifCardHov }
+
+                                                    ColumnLayout {
+                                                        id: notifCardCol
+                                                        anchors.fill: parent; anchors.margins: Theme.px(10); spacing: Theme.px(4)
+
+                                                        // Header: App icon, appName, time, and dismiss X
+                                                        RowLayout {
+                                                            Layout.fillWidth: true; spacing: Theme.px(6)
+
+                                                            // App Icon
+                                                            Item {
+                                                                Layout.preferredWidth: Theme.px(16); Layout.preferredHeight: Theme.px(16)
+
+                                                                Rectangle {
+                                                                    anchors.centerIn: parent
+                                                                    width: Theme.px(6); height: Theme.px(6); radius: Theme.px(3)
+                                                                    color: Theme.primary
+                                                                    visible: !cardAppIcon.visible
+                                                                }
+
+                                                                Image {
+                                                                    id: cardAppIcon
+                                                                    anchors.fill: parent
+                                                                    source: modelData.appIcon || ""
+                                                                    sourceSize: Qt.size(Theme.px(16), Theme.px(16))
+                                                                    fillMode: Image.PreserveAspectFit
+                                                                    visible: !!source && status === Image.Ready
+                                                                }
+                                                            }
+
+                                                            Text {
+                                                                text: modelData.appName || "System"
+                                                                font.family: Theme.font; font.pixelSize: Theme.fontPx(10.5); font.bold: true; color: Theme.primary
+                                                                elide: Text.ElideRight; Layout.maximumWidth: Theme.px(100)
+                                                            }
+
+                                                            Text {
+                                                                text: "• " + (modelData.timeStr || "now")
+                                                                font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(9); color: Theme.fgDim
+                                                            }
+
+                                                            Item { Layout.fillWidth: true }
+
+                                                            // Dismiss X button (revealed on hover)
+                                                            Rectangle {
+                                                                width: Theme.px(18); height: Theme.px(18); radius: Theme.px(9)
+                                                                color: dismissHov.hovered ? Qt.rgba(Theme.err.r, Theme.err.g, Theme.err.b, 0.25) : "transparent"
+                                                                opacity: notifCardHov.hovered ? 1.0 : 0.0
+                                                                HoverHandler { id: dismissHov }
+                                                                MouseArea {
+                                                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                    onClicked: NotificationService.dismissNotification(modelData.id)
+                                                                }
+                                                                Text {
+                                                                    anchors.centerIn: parent
+                                                                    text: "close"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(12)
+                                                                    color: dismissHov.hovered ? Theme.err : Theme.fgDim
+                                                                }
+                                                            }
+                                                        }
+
+                                                        // Summary
+                                                        Text {
+                                                            Layout.fillWidth: true
+                                                            text: modelData.summary || ""
+                                                            font.family: Theme.font; font.pixelSize: Theme.fontPx(11); font.bold: true; color: Theme.fg
+                                                            elide: Text.ElideRight; maximumLineCount: 1; visible: text.length > 0
+                                                        }
+
+                                                        // Body
+                                                        Text {
+                                                            Layout.fillWidth: true
+                                                            text: modelData.body || ""
+                                                            font.family: Theme.font; font.pixelSize: Theme.fontPx(9.5); color: Theme.fgDim
+                                                            elide: Text.ElideRight; maximumLineCount: 2; wrapMode: Text.Wrap; visible: text.length > 0
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ─── COLUMN 3 (32%): Clock & Session Power Grid ───
+                                ColumnLayout {
+                                    Layout.preferredWidth: 32; Layout.fillWidth: true; Layout.fillHeight: true; spacing: Theme.px(10)
 
                                     // Hero Digital Clock
                                     Rectangle {
-                                        Layout.fillWidth: true; Layout.preferredHeight: Theme.px(112); radius: Theme.px(10)
+                                        Layout.fillWidth: true; Layout.preferredHeight: Theme.px(105); radius: Theme.px(12)
                                         color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08)
                                         border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20); border.width: 1
 
@@ -2616,17 +2842,17 @@ PanelWindow {
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: Qt.formatTime(new Date(), "HH:mm")
-                                                font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(38); font.bold: true; color: Theme.primary
+                                                font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(34); font.bold: true; color: Theme.primary
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: Qt.formatDate(new Date(), "dddd, MMMM d, yyyy")
-                                                font.family: Theme.font; font.pixelSize: Theme.fontPx(11); font.bold: true; color: Theme.fg
+                                                text: Qt.formatDate(new Date(), "ddd, MMM d, yyyy")
+                                                font.family: Theme.font; font.pixelSize: Theme.fontPx(10.5); font.bold: true; color: Theme.fg
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: spatialCanvasWindow.systemUptime + " • shogun@Raid"
-                                                font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(9); color: Theme.fgDim
+                                                font.family: Theme.fontMono || "monospace"; font.pixelSize: Theme.fontPx(8.5); color: Theme.fgDim
                                             }
                                         }
                                     }
@@ -2646,11 +2872,11 @@ PanelWindow {
                                                 onClicked: { spatialCanvasWindow.execCommand("hyprlock"); spatialCanvasWindow.closeRequested(); }
                                             }
                                             RowLayout {
-                                                anchors.centerIn: parent; spacing: Theme.px(8)
-                                                Text { text: "lock"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(20); color: Theme.primary }
+                                                anchors.centerIn: parent; spacing: Theme.px(6)
+                                                Text { text: "lock"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(18); color: Theme.primary }
                                                 ColumnLayout {
-                                                    spacing: Theme.px(1)
-                                                    Text { text: "Lock Screen"; font.family: Theme.font; font.pixelSize: Theme.fontPx(11); font.bold: true; color: Theme.fg }
+                                                    spacing: 0
+                                                    Text { text: "Lock Screen"; font.family: Theme.font; font.pixelSize: Theme.fontPx(10.5); font.bold: true; color: Theme.fg }
                                                     Text { text: "Secure station"; font.family: Theme.font; font.pixelSize: Theme.fontPx(8); color: Theme.fgDim }
                                                 }
                                             }
@@ -2667,11 +2893,11 @@ PanelWindow {
                                                 onClicked: { spatialCanvasWindow.execCommand("systemctl suspend"); spatialCanvasWindow.closeRequested(); }
                                             }
                                             RowLayout {
-                                                anchors.centerIn: parent; spacing: Theme.px(8)
-                                                Text { text: "bedtime"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(20); color: Theme.primary }
+                                                anchors.centerIn: parent; spacing: Theme.px(6)
+                                                Text { text: "bedtime"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(18); color: Theme.primary }
                                                 ColumnLayout {
-                                                    spacing: Theme.px(1)
-                                                    Text { text: "Suspend"; font.family: Theme.font; font.pixelSize: Theme.fontPx(11); font.bold: true; color: Theme.fg }
+                                                    spacing: 0
+                                                    Text { text: "Suspend"; font.family: Theme.font; font.pixelSize: Theme.fontPx(10.5); font.bold: true; color: Theme.fg }
                                                     Text { text: "Low power sleep"; font.family: Theme.font; font.pixelSize: Theme.fontPx(8); color: Theme.fgDim }
                                                 }
                                             }
@@ -2688,11 +2914,11 @@ PanelWindow {
                                                 onClicked: { spatialCanvasWindow.execCommand("systemctl reboot"); spatialCanvasWindow.closeRequested(); }
                                             }
                                             RowLayout {
-                                                anchors.centerIn: parent; spacing: Theme.px(8)
-                                                Text { text: "restart_alt"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(20); color: Theme.primary }
+                                                anchors.centerIn: parent; spacing: Theme.px(6)
+                                                Text { text: "restart_alt"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(18); color: Theme.primary }
                                                 ColumnLayout {
-                                                    spacing: Theme.px(1)
-                                                    Text { text: "Reboot"; font.family: Theme.font; font.pixelSize: Theme.fontPx(11); font.bold: true; color: Theme.fg }
+                                                    spacing: 0
+                                                    Text { text: "Reboot"; font.family: Theme.font; font.pixelSize: Theme.fontPx(10.5); font.bold: true; color: Theme.fg }
                                                     Text { text: "Restart system"; font.family: Theme.font; font.pixelSize: Theme.fontPx(8); color: Theme.fgDim }
                                                 }
                                             }
@@ -2709,11 +2935,11 @@ PanelWindow {
                                                 onClicked: { spatialCanvasWindow.execCommand("systemctl poweroff"); spatialCanvasWindow.closeRequested(); }
                                             }
                                             RowLayout {
-                                                anchors.centerIn: parent; spacing: Theme.px(8)
-                                                Text { text: "power_settings_new"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(20); color: p4Hov.hovered ? Theme.err : Theme.fgDim }
+                                                anchors.centerIn: parent; spacing: Theme.px(6)
+                                                Text { text: "power_settings_new"; font.family: Theme.fontIcon; font.pixelSize: Theme.fontPx(18); color: p4Hov.hovered ? Theme.err : Theme.fgDim }
                                                 ColumnLayout {
-                                                    spacing: Theme.px(1)
-                                                    Text { text: "Power Off"; font.family: Theme.font; font.pixelSize: Theme.fontPx(11); font.bold: true; color: p4Hov.hovered ? Theme.err : Theme.fg }
+                                                    spacing: 0
+                                                    Text { text: "Power Off"; font.family: Theme.font; font.pixelSize: Theme.fontPx(10.5); font.bold: true; color: p4Hov.hovered ? Theme.err : Theme.fg }
                                                     Text { text: "Shut down system"; font.family: Theme.font; font.pixelSize: Theme.fontPx(8); color: Theme.fgDim }
                                                 }
                                             }

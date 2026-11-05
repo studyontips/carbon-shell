@@ -64,3 +64,4 @@ FocusHUD FocusHUD.qml
 FocusHUDBackground FocusHUDBackground.qml
 CommandCenter CommandCenter.qml
 SpatialCanvas SpatialCanvas.qml
+PanelsCanvasTab PanelsCanvasTab.qml

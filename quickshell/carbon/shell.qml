@@ -1727,7 +1727,7 @@ ShellRoot {
                     else if (cmd === "spatial-engine" || cmd === "spatial-wallpapers" || cmd === "spatial-settings" || cmd === "settings-node") {
                         root.openSpatialCanvasNode(1, 0)
                     }
-                    else if (cmd === "spatial-media" || cmd === "spatial-session" || cmd === "spatial-power") {
+                    else if (cmd === "spatial-media" || cmd === "spatial-session" || cmd === "spatial-power" || cmd === "spatial-notifications" || cmd === "notifications") {
                         root.openSpatialCanvasNode(0, 1)
                     }
                     else if (cmd.indexOf("spatial-node ") === 0) {
@@ -3412,6 +3412,8 @@ ShellRoot {
                 onToggleMusic: root.toggleCenterDashboard()
                 onOpenMusic: root.openCenterDashboard()
                 onToggleControls: root.toggleCenterDashboard()
+                onOpenSpatialCanvasNode: (gx, gy) => root.openSpatialCanvasNode(gx, gy)
+                onOpenNotifications: root.openSpatialCanvasNode(0, 1)
             }
 
             NotchBarRight {
@@ -3976,6 +3978,8 @@ ShellRoot {
                 onToggleMusic: root.toggleCenterDashboard()
                 onOpenMusic: root.openCenterDashboard()
                 onToggleControls: root.toggleCenterDashboard()
+                onOpenSpatialCanvasNode: (gx, gy) => root.openSpatialCanvasNode(gx, gy)
+                onOpenNotifications: root.openSpatialCanvasNode(0, 1)
             }
         }
     }
@@ -5244,9 +5248,9 @@ ShellRoot {
         }
     }
 
-    /* Notification Toast */
+    /* Notification Toast (Disabled: Replaced by Center Notch ticker & Spatial Canvas log) */
     Variants {
-        model: Quickshell.screens
+        model: []
 
         PanelWindow {
             id: toastWindow

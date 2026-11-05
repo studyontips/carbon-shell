@@ -46,11 +46,23 @@ Singleton {
         if (Theme.dnd !== root.dnd) {
             Theme.dnd = root.dnd
         }
+        if (GlobalState.doNotDisturb !== root.dnd) {
+            GlobalState.doNotDisturb = root.dnd
+        }
         if (!root._loadingConfig) {
             root.persistDnd(root.dnd)
             Quickshell.execDetached(["sh", "-c",
                 (root.dnd ? "touch /tmp/carbon-dnd.on; command -v swaync-client >/dev/null 2>&1 && swaync-client -dn || true" : "rm -f /tmp/carbon-dnd.on; command -v swaync-client >/dev/null 2>&1 && swaync-client -df || true")
             ])
+        }
+    }
+
+    Connections {
+        target: GlobalState
+        function onDoNotDisturbChanged() {
+            if (root.dnd !== GlobalState.doNotDisturb) {
+                root.dnd = GlobalState.doNotDisturb
+            }
         }
     }
 
@@ -125,6 +137,9 @@ Singleton {
     //    expireTimeout: int
     // }]
     property var list: []
+    onListChanged: {
+        GlobalState.notificationsList = root.list
+    }
     property int unreadCount: 0
 
     // Signal emitted when a new notification arrives (carries item data for toast)

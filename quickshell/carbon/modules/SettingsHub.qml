@@ -125,6 +125,7 @@ Item {
                             model: [
                                 { name: "Appearance", glyph: "󰏘", badge: "M3" },
                                 { name: "Modes", glyph: "󱐋", badge: "STUDIO" },
+                                { name: "Panels & Canvas", glyph: "󰹑", badge: "PRO" },
                                 { name: "Display", glyph: "󰍹", badge: "" },
                                 { name: "Audio", glyph: "󰓃", badge: "" },
                                 { name: "Network", glyph: "󰤨", badge: "" },
@@ -215,6 +216,11 @@ Item {
                     ModesTab {
                         anchors.fill: parent
                         visible: root.currentSection.toLowerCase() === "modes"
+                    }
+
+                    PanelsCanvasTab {
+                        anchors.fill: parent
+                        visible: root.currentSection.toLowerCase() === "panels & canvas" || root.currentSection.toLowerCase() === "panels"
                     }
 
                     DisplaysTab {
