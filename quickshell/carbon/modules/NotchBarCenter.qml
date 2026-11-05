@@ -22,21 +22,6 @@ NotchContainer {
     implicitHeight: isExpanded ? Theme.px(270) : ((root.dragActive || root.isUploading) ? Theme.px(48) : Theme.px(34))
     implicitWidth: isExpanded ? Theme.px(820) : (contentImplicitWidth + (leftFillet ? filletRadius : 0) + (rightFillet ? filletRadius : 0) + (horizontalPadding * 2))
 
-    Behavior on implicitWidth {
-        NumberAnimation {
-            duration: 380
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: [0.16, 1.0, 0.3, 1.0, 1.0, 1.0]
-        }
-    }
-    Behavior on width {
-        NumberAnimation {
-            duration: 380
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: [0.16, 1.0, 0.3, 1.0, 1.0, 1.0]
-        }
-    }
-
     earWidth: Theme.px(20)
     contentSpacing: Theme.px(8)
 
@@ -55,6 +40,18 @@ NotchContainer {
     property var activeToast: null
     property bool showNotchToast: false
     readonly property int unreadNotifCount: NotificationService.unreadCount || (GlobalState.notificationsList ? (GlobalState.notificationsList.length || 0) : 0)
+
+    readonly property string notificationContentText: {
+        if (!root.activeToast) return ""
+        var app = (root.activeToast.appName || "").trim()
+        var sum = (root.activeToast.summary || "").trim()
+        var bod = (root.activeToast.body || "").trim()
+        if (sum === app && bod.length > 0) return bod
+        if (sum.length > 0 && bod.length > 0 && bod !== sum) return sum + "  " + bod
+        if (sum.length > 0) return sum
+        if (bod.length > 0) return bod
+        return "New notification"
+    }
 
     Timer {
         id: notchToastTimer
@@ -183,7 +180,9 @@ NotchContainer {
             id: notchContentContainer
             anchors.verticalCenter: parent.verticalCenter
             implicitHeight: Theme.px(26)
-            implicitWidth: root.hudActive ? dynamicPill.implicitWidth : normalNotchRow.implicitWidth
+            implicitWidth: root.hudActive 
+                ? dynamicPill.implicitWidth 
+                : (root.showNotchToast ? notifCapsuleItem.implicitWidth : normalNotchRow.implicitWidth)
             opacity: root.isExpanded ? 0.0 : 1.0
             visible: opacity > 0.01
 
@@ -207,22 +206,94 @@ NotchContainer {
                 }
             }
 
+            /* Notification Mode: Minimal Island Capsule */
+            Item {
+                id: notifCapsuleItem
+                anchors.centerIn: parent
+                implicitHeight: Theme.px(26)
+                implicitWidth: Math.max(Theme.px(200), Math.min(Theme.px(420), notifCapsuleRow.implicitWidth + Theme.px(16)))
+                opacity: (!root.hudActive && root.showNotchToast) ? 1.0 : 0.0
+                visible: opacity > 0.01
+
+                Behavior on opacity {
+                    NumberAnimation { duration: 220; easing.type: Easing.OutQuad }
+                }
+
+                Row {
+                    id: notifCapsuleRow
+                    anchors.centerIn: parent
+                    spacing: Theme.px(10)
+
+                    /* Icon Slot (App Icon or Theme Accent Bell) */
+                    Item {
+                        width: Theme.px(18)
+                        height: Theme.px(18)
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Image {
+                            id: capsuleAppIcon
+                            anchors.fill: parent
+                            source: (root.activeToast && root.activeToast.appIcon) ? root.activeToast.appIcon : ""
+                            sourceSize: Qt.size(Theme.px(18), Theme.px(18))
+                            fillMode: Image.PreserveAspectFit
+                            visible: !!source && status === Image.Ready
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: !capsuleAppIcon.visible
+                            text: "notifications"
+                            font.family: Theme.fontIcon
+                            font.pixelSize: Theme.fontPx(16)
+                            color: Theme.accent
+                        }
+                    }
+
+                    /* Text Content */
+                    Row {
+                        spacing: Theme.px(6)
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Text {
+                            id: notifAppNameText
+                            text: (root.activeToast && root.activeToast.appName && root.activeToast.appName !== "notify-send") ? root.activeToast.appName : ""
+                            visible: text.length > 0
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontPx(11.5)
+                            font.weight: Font.Bold
+                            color: Theme.accent
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Text {
+                            id: notifBodyText
+                            text: root.notificationContentText
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontPx(11.5)
+                            font.weight: Font.DemiBold
+                            color: Theme.fg
+                            elide: Text.ElideRight
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.min(implicitWidth, Theme.px(280))
+                        }
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.openSpatialControlDeck()
+                }
+            }
+
             /* Normal Mode: Clock & Music Row */
             Row {
                 id: normalNotchRow
                 anchors.centerIn: parent
-                anchors.horizontalCenterOffset: root.showNotchToast ? -Theme.px(8) : 0
                 spacing: Theme.px(8)
-                opacity: root.hudActive ? 0.0 : 1.0
+                opacity: (root.hudActive || root.showNotchToast) ? 0.0 : 1.0
                 visible: opacity > 0.01
-
-                Behavior on anchors.horizontalCenterOffset {
-                    NumberAnimation {
-                        duration: 380
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: [0.16, 1.0, 0.3, 1.0, 1.0, 1.0]
-                    }
-                }
 
                 Behavior on opacity {
                     NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
@@ -434,102 +505,6 @@ NotchContainer {
             }
         }
 
-        /* 4. Inline Notification Ticker Segment (Live Alerts) */
-        Item {
-            id: notchTickerItem
-            anchors.verticalCenter: parent.verticalCenter
-            implicitHeight: Theme.px(24)
-            implicitWidth: root.showNotchToast ? Theme.px(220) : 0
-            opacity: root.showNotchToast ? 1.0 : 0.0
-            visible: opacity > 0.01
-            clip: true
-
-            Behavior on opacity {
-                NumberAnimation { duration: 220; easing.type: Easing.OutQuad }
-            }
-
-            Behavior on implicitWidth {
-                NumberAnimation {
-                    duration: 380
-                    easing.type: Easing.BezierSpline
-                    easing.bezierCurve: [0.16, 1.0, 0.3, 1.0, 1.0, 1.0]
-                }
-            }
-
-            Row {
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.px(8)
-                width: parent.width
-
-                /* 1px Vertical Divider */
-                Rectangle {
-                    width: 1
-                    height: Theme.px(16)
-                    color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35)
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
-                /* App Icon / Glowing Status Dot */
-                Item {
-                    width: Theme.px(16)
-                    height: Theme.px(16)
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: Theme.px(7)
-                        height: Theme.px(7)
-                        radius: Theme.px(3.5)
-                        color: Theme.primary
-                        visible: !tickerAppIcon.visible
-                    }
-
-                    Image {
-                        id: tickerAppIcon
-                        anchors.fill: parent
-                        source: (root.activeToast && root.activeToast.appIcon) ? root.activeToast.appIcon : ""
-                        sourceSize: Qt.size(Theme.px(16), Theme.px(16))
-                        fillMode: Image.PreserveAspectFit
-                        visible: !!source && status === Image.Ready
-                    }
-                }
-
-                /* Text: Bold appName + Single-line Summary */
-                Row {
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.px(4)
-                    width: Math.min(implicitWidth, Theme.px(175))
-                    clip: true
-
-                    Text {
-                        text: (root.activeToast && root.activeToast.appName) ? (root.activeToast.appName + ":") : "Alert:"
-                        font.family: Theme.fontFamily || Theme.font
-                        font.pixelSize: Theme.fontPx(11)
-                        font.bold: true
-                        color: Theme.primary
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-
-                    Text {
-                        text: root.activeToast ? (root.activeToast.summary || root.activeToast.body || "Notification") : ""
-                        font.family: Theme.fontFamily || Theme.font
-                        font.pixelSize: Theme.fontPx(11)
-                        color: Theme.fg
-                        elide: Text.ElideRight
-                        width: Math.max(0, Theme.px(175) - parent.children[0].width - Theme.px(6))
-                        maximumLineCount: 1
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.openSpatialControlDeck()
-            }
-        }
     }
     }
     ]
