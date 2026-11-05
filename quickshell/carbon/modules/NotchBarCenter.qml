@@ -19,8 +19,29 @@ NotchContainer {
     property bool isExpanded: false
     clip: true
     bottomRadius: isExpanded ? Theme.px(20) : Theme.px(14)
-    implicitHeight: isExpanded ? Theme.px(270) : ((root.dragActive || root.isUploading) ? Theme.px(48) : Theme.px(34))
-    implicitWidth: isExpanded ? Theme.px(820) : (contentImplicitWidth + (leftFillet ? filletRadius : 0) + (rightFillet ? filletRadius : 0) + (horizontalPadding * 2))
+    readonly property real dashImplicitHeight: dashContent ? dashContent.implicitHeight : Theme.px(270)
+    readonly property real dashImplicitWidth: dashContent ? dashContent.implicitWidth : Theme.px(820)
+    implicitHeight: isExpanded ? dashImplicitHeight : ((root.dragActive || root.isUploading) ? Theme.px(48) : Theme.px(34))
+    implicitWidth: isExpanded ? dashImplicitWidth : (contentImplicitWidth + (leftFillet ? filletRadius : 0) + (rightFillet ? filletRadius : 0) + (horizontalPadding * 2))
+
+    property int notchPage: 0
+    onNotchPageChanged: {
+        if (dashContent && dashContent.notchPage !== root.notchPage) {
+            dashContent.notchPage = root.notchPage
+        }
+    }
+    function previousPage() {
+        if (root.notchPage > -1) {
+            root.notchPage--
+            if (dashContent) dashContent.notchPage = root.notchPage
+        }
+    }
+    function nextPage() {
+        if (root.notchPage < 1) {
+            root.notchPage++
+            if (dashContent) dashContent.notchPage = root.notchPage
+        }
+    }
 
     earWidth: Theme.px(20)
     contentSpacing: Theme.px(8)
@@ -87,6 +108,12 @@ NotchContainer {
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Escape) {
             root.closeCenterDashboard()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Left) {
+            root.previousPage()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Right) {
+            root.nextPage()
             event.accepted = true
         }
     }
@@ -521,6 +548,12 @@ NotchContainer {
         anchors.rightMargin: (root.rightFillet && root.filletRadius > 0) ? root.filletRadius : 0
         showBackground: false
         open: root.isExpanded
+        notchPage: root.notchPage
+        onNotchPageChanged: {
+            if (root.notchPage !== dashContent.notchPage) {
+                root.notchPage = dashContent.notchPage
+            }
+        }
         visible: opacity > 0.01
         opacity: root.isExpanded ? 1.0 : 0.0
         scale: root.isExpanded ? 1.0 : 0.98

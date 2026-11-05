@@ -4,19 +4,18 @@ import QtQuick.Controls
 import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.Pipewire
 import Quickshell.Services.Mpris
 import "../Singletons"
 import "../components"
 
 /**
  * CenterDashboard:
- * High-tech aesthetic tactical dashboard for Carbon // Center Notch.
- * 3-Column Architectural Layout:
- *   1. Left Column: Tactical Timeline (nodes, glowing [ IN PROGRESS ] badge, CalDAV status)
- *   2. Center Column: Aesthetic Animated Tactical Chronometer (orbiting satellite, comet trail, reticle)
- *   3. Right Column: Synchronized LRC Lyrics (live LRCLIB stream, album art, progress readout)
- *
- * 100% Dynamic bindings to Matugen Theme tokens (zero hardcoded colors).
+ * Multi-page tactical deck for Carbon Center Notch.
+ * Pages:
+ *   -1 : Quick Settings Bento (Volume & Brightness sliders, Wi-Fi, BT, DND, Night Light toggles)
+ *    0 : Default Tactical Media & Chronometer
+ *    1 : Pomodoro Focus & Weather
  */
 Item {
     id: root
@@ -28,8 +27,17 @@ Item {
     readonly property bool hovered: (rootHover && rootHover.hovered) || (mainCardHover && mainCardHover.hovered)
     signal closeRequested()
 
-    implicitWidth: Theme.px(820)
-    implicitHeight: Theme.px(270)
+    // ── Multi-Page State (-1, 0, 1) ──────────────────────────────────────────
+    property int notchPage: 0
+    function previousPage() {
+        if (root.notchPage > -1) root.notchPage--
+    }
+    function nextPage() {
+        if (root.notchPage < 1) root.notchPage++
+    }
+
+    implicitWidth: root.notchPage === 0 ? Theme.px(820) : Theme.px(720)
+    implicitHeight: root.notchPage === 0 ? Theme.px(270) : Theme.px(240)
     width: implicitWidth
     height: implicitHeight
     clip: false
@@ -42,6 +50,12 @@ Item {
         if (event.key === Qt.Key_Escape) {
             root.closeRequested()
             event.accepted = true
+        } else if (event.key === Qt.Key_Left) {
+            root.previousPage()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Right) {
+            root.nextPage()
+            event.accepted = true
         }
     }
     Keys.onEscapePressed: (event) => {
@@ -53,23 +67,45 @@ Item {
         id: rootHover
     }
 
+    WheelHandler {
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: (event) => {
+            var dx = event.angleDelta.x
+            var dy = event.angleDelta.y
+            if (Math.abs(dx) > 15 || ((event.modifiers & Qt.ShiftModifier) && Math.abs(dy) > 15)) {
+                var delta = Math.abs(dx) > 15 ? dx : dy
+                if (delta > 0) root.previousPage()
+                else root.nextPage()
+            }
+        }
+    }
+
     readonly property var cardItem: mainCard
-    readonly property var rightColItem: rightCol
     property bool animatingOut: false
-    property string calendarViewMode: "timeline"
-    property int selectedDay: (new Date()).getDate()
-    property bool eventFormMode: false
 
     onOpenChanged: {
         if (root.open) {
             if (LyricsService.hasTrack && (!LyricsService.lines || LyricsService.lines.length === 0)) {
                 LyricsService.reloadLyrics()
             }
+            if (root.notchPage === -1) {
+                wifiPoller.running = true
+                ssidPoller.running = true
+                btPoller.running = true
+            } else if (root.notchPage === 1) {
+                weatherPoller.running = true
+            }
         }
     }
 
-    function openCalendarMode() {
-        root.calendarViewMode = "timeline"
+    onNotchPageChanged: {
+        if (root.notchPage === -1) {
+            wifiPoller.running = true
+            ssidPoller.running = true
+            btPoller.running = true
+        } else if (root.notchPage === 1) {
+            weatherPoller.running = true
+        }
     }
 
     /* ── Format Time Helper (MM:SS or HH:MM:SS) ───────────────────────────── */
@@ -86,6 +122,89 @@ Item {
             return hStr + ":" + mStr + ":" + sStr
         }
         return mStr + ":" + sStr
+    }
+
+    /* ── Backend Pollers for Quick Settings ───────────────────────────────── */
+    Process {
+        id: wifiPoller
+        command: ["sh", "-c", "nmcli radio wifi | tr -d ' \n\r'"]
+        running: root.open && root.notchPage === -1
+        stdout: StdioCollector {
+            onTextChanged: {
+                if (text) tileWifi.wifiOn = (text.trim() === "enabled")
+            }
+        }
+    }
+
+    Process {
+        id: ssidPoller
+        command: ["sh", "-c", "nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | cut -d: -f2-"]
+        running: root.open && root.notchPage === -1
+        stdout: StdioCollector {
+            onTextChanged: {
+                if (text && text.trim().length > 0) tileWifi.ssid = text.trim()
+            }
+        }
+    }
+
+    Process {
+        id: btPoller
+        command: ["sh", "-c", "bluetoothctl show 2>/dev/null | grep 'Powered:' | awk '{print $2}'"]
+        running: root.open && root.notchPage === -1
+        stdout: StdioCollector {
+            onTextChanged: {
+                if (text) tileBt.btOn = (text.trim() === "yes")
+            }
+        }
+    }
+
+    Timer {
+        interval: 4000
+        repeat: true
+        running: root.open && root.notchPage === -1
+        onTriggered: {
+            wifiPoller.running = true
+            ssidPoller.running = true
+            btPoller.running = true
+        }
+    }
+
+    /* ── Backend Poller for Weather ───────────────────────────────────────── */
+    readonly property string weatherScriptPath: (Quickshell.env("HOME") || "") + "/.local/share/quickshell/carbon/scripts/carbon-weather.py"
+    Process {
+        id: weatherPoller
+        command: ["python3", root.weatherScriptPath, "status"]
+        running: root.open && root.notchPage === 1
+        stdout: StdioCollector {
+            waitForEnd: true
+            onTextChanged: {
+                if (text && text.trim().length > 0) {
+                    try {
+                        var d = JSON.parse(text.trim())
+                        if (d) {
+                            weatherCard.cityName = d.city_name || "Patna, IN"
+                            weatherCard.temp = d.temp || "--"
+                            weatherCard.feelsLike = d.feels_like || "--"
+                            weatherCard.desc = d.description || ""
+                            weatherCard.icon = d.icon || "󰖐"
+                            weatherCard.humidity = d.humidity || "--"
+                            weatherCard.wind = d.wind || "--"
+                            weatherCard.forecast = (d.forecast && Array.isArray(d.forecast)) ? d.forecast : []
+                        }
+                    } catch (e) {}
+                }
+            }
+        }
+    }
+
+    Timer {
+        interval: 60000
+        repeat: true
+        running: root.open && root.notchPage === 1
+        onTriggered: {
+            weatherPoller.running = false
+            weatherPoller.running = true
+        }
     }
 
     /* ── Main Card ───────────────────────────────────────────────────────── */
@@ -125,219 +244,1178 @@ Item {
             }
         }
 
-        /* ── 3-Column Layout ─────────────────────────────────────────────── */
-        RowLayout {
+        /* ── Deck Pages Container ────────────────────────────────────────── */
+        Item {
+            id: pagesContainer
             anchors.fill: parent
             anchors.margins: Theme.px(14)
-            spacing: Theme.px(12)
+            clip: true
             z: 1
 
             /* ============================================================= */
-            /* 1. LEFT COLUMN: TACTICAL POMODORO & FOCUS DIRECTIVES           */
+            /* PAGE -1: QUICK SETTINGS BENTO & SLIDERS                       */
             /* ============================================================= */
             Item {
-                id: timelineCol
-                Layout.preferredWidth: Theme.px(240)
-                Layout.fillHeight: true
-                clip: true
-
-                TacticalPomodoro {
-                    anchors.fill: parent
+                id: pageControls
+                anchors.fill: parent
+                visible: opacity > 0.01
+                opacity: root.notchPage === -1 ? 1.0 : 0.0
+                transform: Translate {
+                    x: (-1 - root.notchPage) * Theme.px(80)
+                    Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutExpo } }
                 }
-            }
+                Behavior on opacity { NumberAnimation { duration: 200 } }
 
-            /* ── Vertical Divider 1 ─────────────────────────────────────── */
-            Rectangle {
-                Layout.fillHeight: true
-                width: 1
-                color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
-            }
-
-            /* ============================================================= */
-            /* 2. CENTER COLUMN: AESTHETIC ANIMATED TACTICAL CHRONOMETER     */
-            /* ============================================================= */
-            Item {
-                id: centerCol
-                Layout.fillWidth: true
-                Layout.preferredWidth: Theme.px(288)
-                Layout.fillHeight: true
-                clip: true
-
-                TacticalChronometer {
-                    anchors.centerIn: parent
-                    width: parent.width
-                    height: parent.height
-                }
-            }
-
-            /* ── Vertical Divider 2 ─────────────────────────────────────── */
-            Rectangle {
-                Layout.fillHeight: true
-                width: 1
-                color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
-            }
-
-            /* ============================================================= */
-            /* 3. RIGHT COLUMN: MEDIA PLAYER & LYRICS STREAM                 */
-            /* ============================================================= */
-            Item {
-                id: rightCol
-                Layout.preferredWidth: Theme.px(240)
-                Layout.fillHeight: true
-
-                property string viewMode: "lyrics"
-
-                ColumnLayout {
+                RowLayout {
                     anchors.fill: parent
-                    spacing: Theme.px(8)
+                    spacing: Theme.px(14)
 
-                    // Header: Clean Track Title, Artist & Album Art (Zero "LRC // SYNC" clutter)
-                    RowLayout {
+                    // ── Left Column: Volume & Brightness Sliders ──
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: Theme.px(8)
+                        Layout.preferredWidth: Theme.px(340)
+                        Layout.fillHeight: true
+                        spacing: Theme.px(10)
 
-                        // Track Title & Artist (Clean left aligned)
-                        ColumnLayout {
+                        // A. Volume Studio Capsule Slider
+                        Rectangle {
+                            id: volSlider
                             Layout.fillWidth: true
-                            spacing: 1
+                            Layout.fillHeight: true
+                            radius: Theme.px(16)
+                            color: Qt.rgba(0.04, 0.05, 0.04, 0.85)
+                            border.width: 1
+                            border.color: volMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35) : Qt.rgba(1, 1, 1, 0.08)
+                            clip: true
+                            Behavior on border.color { ColorAnimation { duration: 140 } }
 
+                            readonly property var sink: Pipewire.defaultAudioSink
+                            readonly property real rawVol: (sink && sink.audio && sink.audio.volume !== undefined)
+                                ? sink.audio.volume : (SysBackend ? SysBackend.currentVolume : 0.5)
+                            readonly property bool isMuted: (sink && sink.audio && sink.audio.muted !== undefined)
+                                ? sink.audio.muted : (SysBackend ? SysBackend.isMuted : false)
+                            readonly property real clampedVol: Math.max(0.0, Math.min(1.0, rawVol))
+
+                            // Liquid Fill Bar with Meniscus Glow
+                            Rectangle {
+                                id: volLiquidFill
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.margins: 2
+                                width: volSlider.isMuted ? 0 : Math.max(0, Math.min(parent.width - 4, (parent.width - 4) * volSlider.clampedVol))
+                                radius: Theme.px(14)
+                                gradient: Gradient {
+                                    orientation: Gradient.Horizontal
+                                    GradientStop { position: 0.0; color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) }
+                                    GradientStop { position: 1.0; color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45) }
+                                }
+                                Behavior on width { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
+
+                                Rectangle {
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    anchors.bottom: parent.bottom
+                                    anchors.topMargin: 4
+                                    anchors.bottomMargin: 4
+                                    width: 3
+                                    radius: 1.5
+                                    color: "#FFFFFF"
+                                    visible: !volSlider.isMuted && volSlider.clampedVol > 0.02
+
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 7
+                                        height: parent.height + 4
+                                        radius: 3.5
+                                        color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
+                                        z: -1
+                                    }
+                                }
+                            }
+
+                            // Interactive Mute / Speaker Icon Button (Left)
+                            Rectangle {
+                                id: volMuteBtn
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Theme.px(32)
+                                height: Theme.px(32)
+                                radius: Theme.px(16)
+                                color: volMuteMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.25) : "transparent"
+                                Behavior on color { ColorAnimation { duration: 120 } }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: volSlider.isMuted ? "󰝟" : (volSlider.clampedVol < 0.33 ? "󰕿" : (volSlider.clampedVol < 0.66 ? "󰖀" : "󰕾"))
+                                    font.family: "JetBrainsMono Nerd Font"
+                                    font.pixelSize: 15
+                                    color: volSlider.isMuted ? Theme.fgDim : Theme.primary
+                                }
+
+                                MouseArea {
+                                    id: volMuteMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) {
+                                            Pipewire.defaultAudioSink.audio.muted = !Pipewire.defaultAudioSink.audio.muted
+                                        } else {
+                                            Quickshell.execDetached(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Label: Volume
                             Text {
-                                Layout.fillWidth: true
-                                text: LyricsService.hasTrack ? LyricsService.trackTitle : "No Media"
+                                anchors.left: volMuteBtn.right
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Master Volume"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontPx(11)
-                                font.weight: Font.Bold
-                                color: Theme.fg
-                                elide: Text.ElideRight
+                                font.weight: Font.DemiBold
+                                color: volSlider.isMuted ? Theme.fgDim : Theme.fg
                             }
 
-                            Text {
-                                Layout.fillWidth: true
-                                text: LyricsService.hasTrack ? (LyricsService.trackArtist || "Unknown Artist") : "Standby"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontPx(8.5)
-                                font.weight: Font.Medium
-                                color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.50)
-                                elide: Text.ElideRight
+                            // Right Percentage Badge
+                            Rectangle {
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Theme.px(42)
+                                height: Theme.px(22)
+                                radius: Theme.px(11)
+                                color: Qt.rgba(0, 0, 0, 0.50)
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: volSlider.isMuted ? "MUT" : Math.round(volSlider.clampedVol * 100) + "%"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontPx(10)
+                                    font.bold: true
+                                    color: volSlider.isMuted ? Theme.fgDim : "#FFFFFF"
+                                }
+                            }
+
+                            // Interactive Scrubbing MouseArea
+                            MouseArea {
+                                id: volMouse
+                                anchors.fill: parent
+                                anchors.leftMargin: Theme.px(44)
+                                anchors.rightMargin: Theme.px(54)
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+
+                                function setVolFromX(mouseX) {
+                                    var r = Math.max(0.0, Math.min(1.0, mouseX / width))
+                                    if (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) {
+                                        Pipewire.defaultAudioSink.audio.volume = r
+                                        if (Pipewire.defaultAudioSink.audio.muted) Pipewire.defaultAudioSink.audio.muted = false
+                                    } else {
+                                        Quickshell.execDetached(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", Math.round(r * 100) + "%"])
+                                    }
+                                }
+
+                                onPressed: mouse => setVolFromX(mouse.x)
+                                onPositionChanged: mouse => { if (pressed) setVolFromX(mouse.x) }
+                                onWheel: wheel => {
+                                    var delta = wheel.angleDelta.y > 0 ? 0.05 : -0.05
+                                    var newVol = Math.max(0.0, Math.min(1.0, volSlider.clampedVol + delta))
+                                    if (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) {
+                                        Pipewire.defaultAudioSink.audio.volume = newVol
+                                        if (Pipewire.defaultAudioSink.audio.muted) Pipewire.defaultAudioSink.audio.muted = false
+                                    } else {
+                                        Quickshell.execDetached(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", Math.round(newVol * 100) + "%"])
+                                    }
+                                }
                             }
                         }
 
-                        // Rounded Album Art Square
+                        // B. Brightness Studio Capsule Slider
                         Rectangle {
-                            width: Theme.px(30)
-                            height: Theme.px(30)
-                            radius: Theme.px(8)
-                            color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.90)
-                            border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
+                            id: brightSlider
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: Theme.px(16)
+                            color: Qt.rgba(0.04, 0.05, 0.04, 0.85)
                             border.width: 1
+                            border.color: brightMouse.containsMouse ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.35) : Qt.rgba(1, 1, 1, 0.08)
                             clip: true
+                            Behavior on border.color { ColorAnimation { duration: 140 } }
 
-                            Image {
-                                anchors.fill: parent
-                                source: LyricsService.artUrl
-                                fillMode: Image.PreserveAspectCrop
-                                visible: LyricsService.hasTrack && LyricsService.artUrl.length > 0 && status === Image.Ready
+                            property int curBrightness: (SysBackend && SysBackend.lastBrightnessPct >= 0)
+                                ? SysBackend.lastBrightnessPct : 80
+                            readonly property real brightRatio: Math.max(0.05, Math.min(1.0, curBrightness / 100.0))
+
+                            // Liquid Fill Bar with Meniscus Glow
+                            Rectangle {
+                                id: brightLiquidFill
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.margins: 2
+                                width: Math.max(0, Math.min(parent.width - 4, (parent.width - 4) * brightSlider.brightRatio))
+                                radius: Theme.px(14)
+                                gradient: Gradient {
+                                    orientation: Gradient.Horizontal
+                                    GradientStop { position: 0.0; color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.18) }
+                                    GradientStop { position: 1.0; color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45) }
+                                }
+                                Behavior on width { NumberAnimation { duration: 80; easing.type: Easing.OutCubic } }
+
+                                Rectangle {
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    anchors.bottom: parent.bottom
+                                    anchors.topMargin: 4
+                                    anchors.bottomMargin: 4
+                                    width: 3
+                                    radius: 1.5
+                                    color: "#FFFFFF"
+
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 7
+                                        height: parent.height + 4
+                                        radius: 3.5
+                                        color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
+                                        z: -1
+                                    }
+                                }
                             }
 
+                            // Icon (Left)
+                            Rectangle {
+                                id: brightIconBox
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Theme.px(32)
+                                height: Theme.px(32)
+                                radius: Theme.px(16)
+                                color: "transparent"
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: brightSlider.curBrightness < 33 ? "󰃞" : (brightSlider.curBrightness < 66 ? "󰃟" : "󰃠")
+                                    font.family: "JetBrainsMono Nerd Font"
+                                    font.pixelSize: 15
+                                    color: Theme.primary
+                                }
+                            }
+
+                            // Subtext Label: Brightness
                             Text {
-                                anchors.centerIn: parent
-                                visible: !LyricsService.hasTrack || !LyricsService.artUrl || LyricsService.artUrl.length === 0
-                                text: "music_note"
-                                font.family: Theme.fontIcon
-                                font.pixelSize: 14
-                                color: Theme.primary
+                                anchors.left: brightIconBox.right
+                                anchors.leftMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Screen Brightness"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontPx(11)
+                                font.weight: Font.DemiBold
+                                color: Theme.fg
+                            }
+
+                            // Right Percentage Badge
+                            Rectangle {
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Theme.px(42)
+                                height: Theme.px(22)
+                                radius: Theme.px(11)
+                                color: Qt.rgba(0, 0, 0, 0.50)
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: brightSlider.curBrightness + "%"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontPx(10)
+                                    font.bold: true
+                                    color: "#FFFFFF"
+                                }
+                            }
+
+                            // Interactive Scrubbing MouseArea
+                            MouseArea {
+                                id: brightMouse
+                                anchors.fill: parent
+                                anchors.leftMargin: Theme.px(44)
+                                anchors.rightMargin: Theme.px(54)
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+
+                                function setBrightFromX(mouseX) {
+                                    var pct = Math.round(Math.max(5, Math.min(100, (mouseX / width) * 100)))
+                                    brightSlider.curBrightness = pct
+                                    Quickshell.execDetached(["brightnessctl", "set", pct + "%", "-q"])
+                                }
+
+                                onPressed: mouse => setBrightFromX(mouse.x)
+                                onPositionChanged: mouse => { if (pressed) setBrightFromX(mouse.x) }
+                                onWheel: wheel => {
+                                    var delta = wheel.angleDelta.y > 0 ? 5 : -5
+                                    var pct = Math.max(5, Math.min(100, brightSlider.curBrightness + delta))
+                                    brightSlider.curBrightness = pct
+                                    Quickshell.execDetached(["brightnessctl", "set", pct + "%", "-q"])
+                                }
                             }
                         }
                     }
 
-                    // Mini Cairo Kinetic Lyric Engine (Dedicated to this mode)
-                    MiniCairo {
+                    // ── Right Column: 2x2 Quick Toggles Grid ──
+                    GridLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: Theme.px(340)
+                        Layout.fillHeight: true
+                        columns: 2
+                        rowSpacing: Theme.px(8)
+                        columnSpacing: Theme.px(8)
+
+                        // ── Button 1: Wi-Fi ──
+                        Rectangle {
+                            id: tileWifi
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: Theme.px(14)
+                            property bool wifiOn: true
+                            property string ssid: "Connected"
+                            color: tileWifi.wifiOn
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, wifiMouse.containsMouse ? 0.22 : 0.14)
+                                : (wifiMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.04))
+                            border.width: 1
+                            border.color: tileWifi.wifiOn
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
+                                : Qt.rgba(1, 1, 1, 0.08)
+                            Behavior on color { ColorAnimation { duration: 130 } }
+                            Behavior on border.color { ColorAnimation { duration: 130 } }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: Theme.px(10)
+                                spacing: Theme.px(8)
+
+                                Rectangle {
+                                    Layout.preferredWidth: Theme.px(30)
+                                    Layout.preferredHeight: Theme.px(30)
+                                    radius: Theme.px(15)
+                                    color: tileWifi.wifiOn ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
+                                    scale: wifiMouse.pressed ? 0.92 : 1.0
+                                    Behavior on scale { NumberAnimation { duration: 90 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: tileWifi.wifiOn ? "󰤨" : "󰤭"
+                                        font.family: "JetBrainsMono Nerd Font"
+                                        font.pixelSize: 14
+                                        color: tileWifi.wifiOn ? "#090b0a" : Theme.fgDim
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
+                                    Text {
+                                        text: "Wi-Fi"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(11)
+                                        font.bold: true
+                                        color: Theme.fg
+                                    }
+                                    Text {
+                                        text: tileWifi.wifiOn ? tileWifi.ssid : "Off"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(9.5)
+                                        color: tileWifi.wifiOn ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70) : Theme.fgDim
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: wifiMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                pressAndHoldInterval: 450
+                                property bool held: false
+                                onPressed: { held = false }
+                                onPressAndHold: {
+                                    held = true
+                                    Quickshell.execDetached(["nm-connection-editor"])
+                                }
+                                onClicked: {
+                                    if (!held) {
+                                        var nextState = !tileWifi.wifiOn
+                                        tileWifi.wifiOn = nextState
+                                        Quickshell.execDetached(["nmcli", "radio", "wifi", nextState ? "on" : "off"])
+                                        wifiPoller.running = false
+                                        wifiPoller.running = true
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Button 2: Bluetooth ──
+                        Rectangle {
+                            id: tileBt
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: Theme.px(14)
+                            property bool btOn: false
+                            color: tileBt.btOn
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, btMouse.containsMouse ? 0.22 : 0.14)
+                                : (btMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.04))
+                            border.width: 1
+                            border.color: tileBt.btOn
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
+                                : Qt.rgba(1, 1, 1, 0.08)
+                            Behavior on color { ColorAnimation { duration: 130 } }
+                            Behavior on border.color { ColorAnimation { duration: 130 } }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: Theme.px(10)
+                                spacing: Theme.px(8)
+
+                                Rectangle {
+                                    Layout.preferredWidth: Theme.px(30)
+                                    Layout.preferredHeight: Theme.px(30)
+                                    radius: Theme.px(15)
+                                    color: tileBt.btOn ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
+                                    scale: btMouse.pressed ? 0.92 : 1.0
+                                    Behavior on scale { NumberAnimation { duration: 90 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: tileBt.btOn ? "󰂯" : "󰂲"
+                                        font.family: "JetBrainsMono Nerd Font"
+                                        font.pixelSize: 14
+                                        color: tileBt.btOn ? "#090b0a" : Theme.fgDim
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
+                                    Text {
+                                        text: "Bluetooth"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(11)
+                                        font.bold: true
+                                        color: Theme.fg
+                                    }
+                                    Text {
+                                        text: tileBt.btOn ? "Enabled" : "Off"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(9.5)
+                                        color: tileBt.btOn ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70) : Theme.fgDim
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: btMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                pressAndHoldInterval: 450
+                                property bool held: false
+                                onPressed: { held = false }
+                                onPressAndHold: {
+                                    held = true
+                                    Quickshell.execDetached(["blueman-manager"])
+                                }
+                                onClicked: {
+                                    if (!held) {
+                                        var next = !tileBt.btOn
+                                        tileBt.btOn = next
+                                        Quickshell.execDetached(["bluetoothctl", "power", next ? "on" : "off"])
+                                        btPoller.running = false
+                                        btPoller.running = true
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Button 3: Do Not Disturb ──
+                        Rectangle {
+                            id: tileDnd
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: Theme.px(14)
+                            readonly property bool isDnd: NotificationService.dnd || GlobalState.doNotDisturb
+                            color: tileDnd.isDnd
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, dndMouse.containsMouse ? 0.22 : 0.14)
+                                : (dndMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.04))
+                            border.width: 1
+                            border.color: tileDnd.isDnd
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
+                                : Qt.rgba(1, 1, 1, 0.08)
+                            Behavior on color { ColorAnimation { duration: 130 } }
+                            Behavior on border.color { ColorAnimation { duration: 130 } }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: Theme.px(10)
+                                spacing: Theme.px(8)
+
+                                Rectangle {
+                                    Layout.preferredWidth: Theme.px(30)
+                                    Layout.preferredHeight: Theme.px(30)
+                                    radius: Theme.px(15)
+                                    color: tileDnd.isDnd ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
+                                    scale: dndMouse.pressed ? 0.92 : 1.0
+                                    Behavior on scale { NumberAnimation { duration: 90 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: tileDnd.isDnd ? "󰂛" : "󰂚"
+                                        font.family: "JetBrainsMono Nerd Font"
+                                        font.pixelSize: 14
+                                        color: tileDnd.isDnd ? "#090b0a" : Theme.fgDim
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
+                                    Text {
+                                        text: "Do Not Disturb"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(11)
+                                        font.bold: true
+                                        color: Theme.fg
+                                    }
+                                    Text {
+                                        text: tileDnd.isDnd ? "Muted" : "Alerts On"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(9.5)
+                                        color: tileDnd.isDnd ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70) : Theme.fgDim
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: dndMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (typeof NotificationService !== "undefined" && NotificationService.toggleDnd) {
+                                        NotificationService.toggleDnd()
+                                        GlobalState.doNotDisturb = NotificationService.dnd
+                                    } else {
+                                        GlobalState.doNotDisturb = !GlobalState.doNotDisturb
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Button 4: Night Light / Appearance ──
+                        Rectangle {
+                            id: tileAppr
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            radius: Theme.px(14)
+                            readonly property bool isDark: (typeof Theme !== "undefined" && Theme.isDark !== undefined) ? Theme.isDark : true
+                            color: tileAppr.isDark
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, apprMouse.containsMouse ? 0.22 : 0.14)
+                                : (apprMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.04))
+                            border.width: 1
+                            border.color: tileAppr.isDark
+                                ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
+                                : Qt.rgba(1, 1, 1, 0.08)
+                            Behavior on color { ColorAnimation { duration: 130 } }
+                            Behavior on border.color { ColorAnimation { duration: 130 } }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: Theme.px(10)
+                                spacing: Theme.px(8)
+
+                                Rectangle {
+                                    Layout.preferredWidth: Theme.px(30)
+                                    Layout.preferredHeight: Theme.px(30)
+                                    radius: Theme.px(15)
+                                    color: tileAppr.isDark ? Theme.primary : Qt.rgba(1, 1, 1, 0.08)
+                                    scale: apprMouse.pressed ? 0.92 : 1.0
+                                    Behavior on scale { NumberAnimation { duration: 90 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: tileAppr.isDark ? "󰖔" : "󰖙"
+                                        font.family: "JetBrainsMono Nerd Font"
+                                        font.pixelSize: 14
+                                        color: tileAppr.isDark ? "#090b0a" : Theme.fgDim
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
+                                    Text {
+                                        text: "Theme"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(11)
+                                        font.bold: true
+                                        color: Theme.fg
+                                    }
+                                    Text {
+                                        text: tileAppr.isDark ? "Dark Modern" : "Light Aura"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(9.5)
+                                        color: tileAppr.isDark ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70) : Theme.fgDim
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: apprMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (typeof Theme !== "undefined" && Theme.isDark !== undefined) {
+                                        Theme.isDark = !Theme.isDark
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            /* ============================================================= */
+            /* PAGE 0: DEFAULT MEDIA & TACTICAL CHRONOMETER                  */
+            /* ============================================================= */
+            Item {
+                id: pageMedia
+                anchors.fill: parent
+                visible: opacity > 0.01
+                opacity: root.notchPage === 0 ? 1.0 : 0.0
+                transform: Translate {
+                    x: (0 - root.notchPage) * Theme.px(80)
+                    Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutExpo } }
+                }
+                Behavior on opacity { NumberAnimation { duration: 200 } }
+
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: Theme.px(12)
+
+                    // 1. LEFT COLUMN: TACTICAL POMODORO
+                    Item {
+                        id: timelineCol
+                        Layout.preferredWidth: Theme.px(240)
+                        Layout.fillHeight: true
+                        clip: true
+
+                        TacticalPomodoro {
+                            anchors.fill: parent
+                        }
+                    }
+
+                    // Vertical Divider 1
+                    Rectangle {
+                        Layout.fillHeight: true
+                        width: 1
+                        color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
+                    }
+
+                    // 2. CENTER COLUMN: ANIMATED TACTICAL CHRONOMETER
+                    Item {
+                        id: centerCol
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: Theme.px(288)
+                        Layout.fillHeight: true
+                        clip: true
+
+                        TacticalChronometer {
+                            anchors.centerIn: parent
+                            width: parent.width
+                            height: parent.height
+                        }
+                    }
+
+                    // Vertical Divider 2
+                    Rectangle {
+                        Layout.fillHeight: true
+                        width: 1
+                        color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
+                    }
+
+                    // 3. RIGHT COLUMN: MEDIA PLAYER & LYRICS STREAM
+                    Item {
+                        id: rightCol
+                        Layout.preferredWidth: Theme.px(240)
+                        Layout.fillHeight: true
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: Theme.px(6)
+
+                            // Track Title, Artist & Art
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.px(8)
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 1
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: LyricsService.hasTrack ? LyricsService.trackTitle : "No Media"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(11)
+                                        font.weight: Font.Bold
+                                        color: Theme.fg
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: LyricsService.hasTrack ? (LyricsService.trackArtist || "Unknown Artist") : "Standby"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(8.5)
+                                        font.weight: Font.Medium
+                                        color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.50)
+                                        elide: Text.ElideRight
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: Theme.px(30)
+                                    height: Theme.px(30)
+                                    radius: Theme.px(8)
+                                    color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.90)
+                                    border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.40)
+                                    border.width: 1
+                                    clip: true
+
+                                    Image {
+                                        anchors.fill: parent
+                                        source: LyricsService.artUrl
+                                        fillMode: Image.PreserveAspectCrop
+                                        visible: LyricsService.hasTrack && LyricsService.artUrl.length > 0 && status === Image.Ready
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        visible: !LyricsService.hasTrack || !LyricsService.artUrl || LyricsService.artUrl.length === 0
+                                        text: "music_note"
+                                        font.family: Theme.fontIcon
+                                        font.pixelSize: 14
+                                        color: Theme.primary
+                                    }
+                                }
+                            }
+
+                            // Dynamic Visualizer / Lyrics
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                clip: true
+
+                                MiniCairo {
+                                    anchors.centerIn: parent
+                                    visible: !LyricsService.hasTrack || !LyricsService.lines || LyricsService.lines.length === 0
+                                }
+
+                                ListView {
+                                    id: lyricsList
+                                    anchors.fill: parent
+                                    visible: LyricsService.hasTrack && LyricsService.lines && LyricsService.lines.length > 0
+                                    model: LyricsService.lines || []
+                                    clip: true
+                                    spacing: 4
+                                    preferredHighlightBegin: parent.height * 0.40
+                                    preferredHighlightEnd: parent.height * 0.60
+                                    highlightRangeMode: ListView.ApplyRange
+
+                                    currentIndex: {
+                                        if (!LyricsService.lines || LyricsService.lines.length === 0) return 0
+                                        var pos = LyricsService.currentPosition
+                                        var idx = 0
+                                        for (var i = 0; i < LyricsService.lines.length; i++) {
+                                            if (LyricsService.lines[i].time <= pos) idx = i
+                                            else break
+                                        }
+                                        return idx
+                                    }
+
+                                    delegate: Item {
+                                        width: lyricsList.width
+                                        height: lyricText.implicitHeight + 4
+                                        readonly property bool isCurrent: index === lyricsList.currentIndex
+
+                                        Text {
+                                            id: lyricText
+                                            anchors.centerIn: parent
+                                            width: parent.width - 8
+                                            text: modelData.text || ""
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: isCurrent ? Theme.fontPx(11) : Theme.fontPx(9.5)
+                                            font.weight: isCurrent ? Font.Bold : Font.Normal
+                                            color: isCurrent ? Theme.primary : Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.40)
+                                            horizontalAlignment: Text.AlignHCenter
+                                            wrapMode: Text.Wrap
+                                            Behavior on color { ColorAnimation { duration: 160 } }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Media Transport Bar
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: Theme.px(24)
+                                spacing: Theme.px(8)
+
+                                Text {
+                                    text: root.formatTime(LyricsService.currentPosition) + " / " + root.formatTime(LyricsService.totalLength)
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontPx(8.5)
+                                    color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.50)
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                // Prev
+                                Rectangle {
+                                    width: 20; height: 20; radius: 10
+                                    color: prevM.containsMouse ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.12) : "transparent"
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "skip_previous"
+                                        font.family: Theme.fontIcon
+                                        font.pixelSize: 13
+                                        color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70)
+                                    }
+                                    MouseArea {
+                                        id: prevM
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: if (LyricsService.activePlayer) LyricsService.activePlayer.previous()
+                                    }
+                                }
+
+                                // Play / Pause
+                                Rectangle {
+                                    width: 22; height: 22; radius: 11
+                                    color: playM.containsMouse ? Theme.primary : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20)
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: LyricsService.isPlaying ? "pause" : "play_arrow"
+                                        font.family: Theme.fontIcon
+                                        font.pixelSize: 14
+                                        color: playM.containsMouse ? Theme.bg : Theme.primary
+                                    }
+                                    MouseArea {
+                                        id: playM
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: if (LyricsService.activePlayer) LyricsService.activePlayer.togglePlaying()
+                                    }
+                                }
+
+                                // Next
+                                Rectangle {
+                                    width: 20; height: 20; radius: 10
+                                    color: nextM.containsMouse ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.12) : "transparent"
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "skip_next"
+                                        font.family: Theme.fontIcon
+                                        font.pixelSize: 13
+                                        color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70)
+                                    }
+                                    MouseArea {
+                                        id: nextM
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: if (LyricsService.activePlayer) LyricsService.activePlayer.next()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            /* ============================================================= */
+            /* PAGE 1: POMODORO & WEATHER                                    */
+            /* ============================================================= */
+            Item {
+                id: pagePomodoroWeather
+                anchors.fill: parent
+                visible: opacity > 0.01
+                opacity: root.notchPage === 1 ? 1.0 : 0.0
+                transform: Translate {
+                    x: (1 - root.notchPage) * Theme.px(80)
+                    Behavior on x { NumberAnimation { duration: 280; easing.type: Easing.OutExpo } }
+                }
+                Behavior on opacity { NumberAnimation { duration: 200 } }
+
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: Theme.px(14)
+
+                    // ── Left Column: Tactical Pomodoro ──
+                    Item {
+                        Layout.preferredWidth: Theme.px(320)
+                        Layout.fillHeight: true
+                        clip: true
+
+                        TacticalPomodoro {
+                            anchors.fill: parent
+                        }
+                    }
+
+                    // Vertical Divider
+                    Rectangle {
+                        Layout.fillHeight: true
+                        width: 1
+                        color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.08)
+                    }
+
+                    // ── Right Column: Weather Bento Card ──
+                    Item {
+                        id: weatherCard
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        active: root.open
-                    }
 
-                    // Footer: Track Progress & Controls
-                    RowLayout {
-                        Layout.fillWidth: true
+                        property string cityName: "Patna, IN"
+                        property string temp: "--"
+                        property string feelsLike: "--"
+                        property string desc: "Clear Sky"
+                        property string icon: "󰖐"
+                        property string humidity: "--"
+                        property string wind: "--"
+                        property var forecast: []
 
-                        Text {
-                            text: root.formatTime(LyricsService.currentPosition) + "  /  " + root.formatTime(LyricsService.totalLength)
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontPx(9)
-                            font.weight: Font.Medium
-                            color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.45)
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: Theme.px(14)
+                            color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.05)
+                            border.width: 1
+                            border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.15)
                         }
 
-                        Item { Layout.fillWidth: true }
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: Theme.px(12)
+                            spacing: Theme.px(8)
 
-                        // Transport Controls
-                        RowLayout {
-                            spacing: 6
+                            // Top Header: City & Refresh
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.px(8)
 
-                            // Prev
-                            Rectangle {
-                                width: 20
-                                height: 20
-                                radius: 10
-                                color: prevM.containsMouse ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.12) : "transparent"
                                 Text {
-                                    anchors.centerIn: parent
-                                    text: "skip_previous"
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: 13
-                                    color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70)
+                                    text: "󰍎 " + weatherCard.cityName
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontPx(12)
+                                    font.bold: true
+                                    color: Theme.fg
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
                                 }
-                                MouseArea {
-                                    id: prevM
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: if (LyricsService.activePlayer) LyricsService.activePlayer.previous()
+
+                                Rectangle {
+                                    width: Theme.px(24)
+                                    height: Theme.px(24)
+                                    radius: Theme.px(12)
+                                    color: weathRefHov.containsMouse ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.12) : "transparent"
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "󰑐"
+                                        font.family: "JetBrainsMono Nerd Font"
+                                        font.pixelSize: 13
+                                        color: weathRefHov.containsMouse ? Theme.primary : Theme.fgDim
+                                    }
+                                    MouseArea {
+                                        id: weathRefHov
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            weatherPoller.command = ["python3", root.weatherScriptPath, "status", "--force"]
+                                            weatherPoller.running = false
+                                            weatherPoller.running = true
+                                        }
+                                    }
                                 }
                             }
 
-                            // Play/Pause
-                            Rectangle {
-                                width: 22
-                                height: 22
-                                radius: 11
-                                color: playM.containsMouse ? Theme.primary : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.20)
+                            // Center Row: Icon + Temp + Description
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.px(12)
+
+                                // Weather Icon
                                 Text {
-                                    anchors.centerIn: parent
-                                    text: LyricsService.isPlaying ? "pause" : "play_arrow"
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: 14
-                                    color: playM.containsMouse ? Theme.bg : Theme.primary
+                                    text: weatherCard.icon
+                                    font.family: "JetBrainsMono Nerd Font"
+                                    font.pixelSize: 36
+                                    color: Theme.primary
                                 }
-                                MouseArea {
-                                    id: playM
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: if (LyricsService.activePlayer) LyricsService.activePlayer.togglePlaying()
+
+                                ColumnLayout {
+                                    spacing: 0
+                                    Text {
+                                        text: weatherCard.temp
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(22)
+                                        font.bold: true
+                                        color: Theme.fg
+                                    }
+                                    Text {
+                                        text: weatherCard.desc
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(10)
+                                        color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70)
+                                        elide: Text.ElideRight
+                                    }
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                // Feels Like Badge
+                                Rectangle {
+                                    Layout.preferredHeight: Theme.px(22)
+                                    Layout.preferredWidth: feelsText.implicitWidth + Theme.px(14)
+                                    radius: Theme.px(11)
+                                    color: Qt.rgba(0, 0, 0, 0.40)
+                                    border.width: 1
+                                    border.color: Qt.rgba(1, 1, 1, 0.08)
+
+                                    Text {
+                                        id: feelsText
+                                        anchors.centerIn: parent
+                                        text: "Feels " + weatherCard.feelsLike
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontPx(9)
+                                        color: Theme.primary
+                                    }
                                 }
                             }
 
-                            // Next
-                            Rectangle {
-                                width: 20
-                                height: 20
-                                radius: 10
-                                color: nextM.containsMouse ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.12) : "transparent"
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "skip_next"
-                                    font.family: Theme.fontIcon
-                                    font.pixelSize: 13
-                                    color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.70)
+                            // Sub-metrics Row (Humidity & Wind)
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.px(10)
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: Theme.px(26)
+                                    radius: Theme.px(8)
+                                    color: Qt.rgba(0, 0, 0, 0.30)
+                                    border.width: 1
+                                    border.color: Qt.rgba(1, 1, 1, 0.06)
+
+                                    RowLayout {
+                                        anchors.centerIn: parent
+                                        spacing: Theme.px(4)
+                                        Text {
+                                            text: "󰖌"
+                                            font.family: "JetBrainsMono Nerd Font"
+                                            font.pixelSize: 11
+                                            color: Theme.primary
+                                        }
+                                        Text {
+                                            text: "Humidity " + weatherCard.humidity
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontPx(9)
+                                            color: Theme.fgDim
+                                        }
+                                    }
                                 }
-                                MouseArea {
-                                    id: nextM
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: if (LyricsService.activePlayer) LyricsService.activePlayer.next()
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: Theme.px(26)
+                                    radius: Theme.px(8)
+                                    color: Qt.rgba(0, 0, 0, 0.30)
+                                    border.width: 1
+                                    border.color: Qt.rgba(1, 1, 1, 0.06)
+
+                                    RowLayout {
+                                        anchors.centerIn: parent
+                                        spacing: Theme.px(4)
+                                        Text {
+                                            text: "󰖝"
+                                            font.family: "JetBrainsMono Nerd Font"
+                                            font.pixelSize: 11
+                                            color: Theme.primary
+                                        }
+                                        Text {
+                                            text: "Wind " + weatherCard.wind
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontPx(9)
+                                            color: Theme.fgDim
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Forecast mini preview row
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: Theme.px(32)
+                                spacing: Theme.px(6)
+                                visible: weatherCard.forecast && weatherCard.forecast.length > 0
+
+                                Repeater {
+                                    model: (weatherCard.forecast && Array.isArray(weatherCard.forecast)) ? weatherCard.forecast.slice(0, 4) : []
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        radius: Theme.px(6)
+                                        color: Qt.rgba(1, 1, 1, 0.03)
+                                        border.width: 1
+                                        border.color: Qt.rgba(1, 1, 1, 0.05)
+
+                                        RowLayout {
+                                            anchors.centerIn: parent
+                                            spacing: Theme.px(4)
+                                            Text {
+                                                text: modelData.day || ""
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontPx(8.5)
+                                                font.bold: true
+                                                color: Theme.fgDim
+                                            }
+                                            Text {
+                                                text: modelData.icon || "󰖐"
+                                                font.family: "JetBrainsMono Nerd Font"
+                                                font.pixelSize: 10
+                                                color: Theme.primary
+                                            }
+                                            Text {
+                                                text: modelData.temp || "--"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontPx(8.5)
+                                                color: Theme.fg
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

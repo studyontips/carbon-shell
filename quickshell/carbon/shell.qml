@@ -97,6 +97,8 @@ ShellRoot {
         if (root.spatialCanvasOpen) root.closeSpatialCanvas()
         else root.openSpatialCanvas()
     }
+    onSpatialCanvasOpenChanged: GlobalState.isCommandCenterOpen = root.spatialCanvasOpen || root.commandCenterOpen
+    onCommandCenterOpenChanged: GlobalState.isCommandCenterOpen = root.spatialCanvasOpen || root.commandCenterOpen
 
     property bool focusHudOpen: false
     function openFocusHud() {
@@ -277,14 +279,17 @@ ShellRoot {
     }
 
     /* Center Dashboard state */
+    property var notchCenterItem: null
     property bool centerDashboardOpen: false
     property bool centerDashboardPinned: false
     property bool centerDashboardHovered: false
     property bool centerDashboardHidden: true
 
-    function openCenterDashboard() {
+    function openCenterDashboard(pinned) {
         centerDashboardLeaveTimer.stop()
         root.closeAllPopupsExcept("centerDashboard")
+        if (pinned !== undefined) root.centerDashboardPinned = pinned
+        else root.centerDashboardPinned = true
         root.centerDashboardOpen = true
     }
     function closeCenterDashboard(force) {
@@ -1463,29 +1468,20 @@ ShellRoot {
 
     function openControls() {
         if (root.barMode === "nucleus") return
-        root.closeAllPopupsExcept("controls")
-        root.controlsPinned = true
-        root.controlsVisible = true
+        root.closeAllPopupsExcept("centerDashboard")
+        if (root.notchCenterItem) root.notchCenterItem.notchPage = -1
+        root.openCenterDashboard(true)
     }
     function openControlsHover() {
-        if (root.barMode === "nucleus") return
-        root.closeAllPopupsExcept("controls")
-        root.controlsPinned = false
-        root.controlsVisible = true
-        controlsLeaveTimer.stop()
+        root.openControls()
     }
-    function closeControls() { root.controlsVisible = false; root.controlsPinned = false }
+    function closeControls() { root.closeCenterDashboard() }
     function toggleControls() {
-        if (root.barMode === "nucleus") {
-            root.closeControls()
-            return
-        }
-        if (root.controlsVisible) {
-            root.closeControls()
+        if (root.centerDashboardOpen && root.notchCenterItem && root.notchCenterItem.notchPage === -1) {
+            root.closeCenterDashboard()
         } else {
-            root.closeAllPopupsExcept("controls")
-            root.controlsPinned = true
-            root.controlsVisible = true
+            if (root.notchCenterItem) root.notchCenterItem.notchPage = -1
+            root.openCenterDashboard(true)
         }
     }
 
@@ -1775,6 +1771,16 @@ ShellRoot {
                         root.toggleSmallMusic()
                     else if (cmd === "controls")
                         root.toggleControls()
+                    else if (cmd === "notch-left" || cmd === "controls-prev") {
+                        if (root.notchCenterItem) root.notchCenterItem.previousPage()
+                    }
+                    else if (cmd === "notch-right" || cmd === "controls-next") {
+                        if (root.notchCenterItem) root.notchCenterItem.nextPage()
+                    }
+                    else if (cmd.indexOf("notch-page ") === 0) {
+                        var pNum = parseInt(cmd.substring(11).trim())
+                        if (!isNaN(pNum) && root.notchCenterItem) root.notchCenterItem.notchPage = pNum
+                    }
                     else if (cmd === "controls wifi") {
                         root.openControls()
                         if (controlsItem) controlsItem.openWifiDetails()
@@ -3341,6 +3347,12 @@ ShellRoot {
                         console.log("[notchBarWindow] ESCAPE PRESSED - closing center dashboard")
                         root.closeCenterDashboard()
                         event.accepted = true
+                    } else if (event.key === Qt.Key_Left) {
+                        if (notchCenterItem) notchCenterItem.previousPage()
+                        event.accepted = true
+                    } else if (event.key === Qt.Key_Right) {
+                        if (notchCenterItem) notchCenterItem.nextPage()
+                        event.accepted = true
                     }
                 }
                 Keys.onEscapePressed: (event) => {
@@ -3350,7 +3362,7 @@ ShellRoot {
                 }
             }
 
-            mask: (root.barMode === "notch" && notchBarWindow.visible) ? notchMask : null
+            mask: (root.barMode === "notch" && notchBarWindow.visible && !GlobalState.isCommandCenterOpen) ? notchMask : null
             Region {
                 id: notchMask
                 Region {
@@ -3373,80 +3385,91 @@ ShellRoot {
                 }
             }
 
-            NotchBarLeft {
-                id: notchLeftItem
-                visible: true
-                notchOpacity: root.notchOpacity
-                filletRadius: root.notchEarRadius
-                bottomRadius: root.sideNotchBottomRadius
-                height: root.notchHeight
-                implicitHeight: root.notchHeight
-                attachedBottom: root.mainBarEdge === "bottom"
-                y: root.mainBarEdge === "bottom" ? (notchBarWindow.height - height) : 0
-                anchors.left: parent.left
-                leftFillet: false
-                rightFillet: true
-                onToggleSpotlight: root.toggleDefaultLauncher()
-                onOpenSpotlight: root.toggleDefaultLauncher()
-            }
+            Item {
+                id: notchBarContent
+                anchors.fill: parent
+                opacity: !GlobalState.isCommandCenterOpen ? 1.0 : 0.0
+                visible: opacity > 0.005
+                Behavior on opacity {
+                    NumberAnimation { duration: 200 }
+                }
 
-            NotchBarCenter {
-                id: notchCenterItem
-                z: root.centerDashboardOpen ? 100 : 1
-                notchOpacity: root.notchOpacity
-                filletRadius: root.notchEarRadius
-                bottomRadius: root.centerDashboardOpen ? 20 : root.notchBottomRadius
-                isExpanded: root.centerDashboardOpen
-                visible: root.musicBarEdge === root.mainBarEdge
-                barContent: root.musicBarContent
-                showVinylDisc: root.showVinylDisc
-                showEqualizer: root.showEqualizer
-                attachedBottom: root.mainBarEdge === "bottom"
-                hasAttachedPopup: (root.calendarOpen || root.smallMusicOpen) && !root.centerDashboardOpen
-                height: isExpanded ? 270 : ((notchCenterItem.dragActive || notchCenterItem.isUploading) ? Math.round(48 * root.shellScale) : root.notchHeight)
-                implicitHeight: isExpanded ? 270 : ((notchCenterItem.dragActive || notchCenterItem.isUploading) ? Math.round(48 * root.shellScale) : root.notchHeight)
-                y: root.mainBarEdge === "bottom" ? (notchBarWindow.height - height) : 0
-                anchors.horizontalCenter: parent.horizontalCenter
-                leftFillet: true
-                rightFillet: true
-                onToggleCenterDashboard: root.toggleCenterDashboard()
-                onCloseCenterDashboard: root.closeCenterDashboard()
-                onToggleMusic: root.toggleCenterDashboard()
-                onOpenMusic: root.openCenterDashboard()
-                onToggleControls: root.toggleCenterDashboard()
-                onOpenSpatialCanvasNode: (gx, gy) => root.openSpatialCanvasNode(gx, gy)
-                onOpenNotifications: root.openSpatialCanvasNode(0, 1)
-            }
+                NotchBarLeft {
+                    id: notchLeftItem
+                    visible: true
+                    notchOpacity: root.notchOpacity
+                    filletRadius: root.notchEarRadius
+                    bottomRadius: root.sideNotchBottomRadius
+                    height: root.notchHeight
+                    implicitHeight: root.notchHeight
+                    attachedBottom: root.mainBarEdge === "bottom"
+                    y: root.mainBarEdge === "bottom" ? (notchBarWindow.height - height) : 0
+                    anchors.left: parent.left
+                    leftFillet: false
+                    rightFillet: true
+                    onToggleSpotlight: root.toggleDefaultLauncher()
+                    onOpenSpotlight: root.toggleDefaultLauncher()
+                }
 
-            NotchBarRight {
-                id: notchRightItem
-                z: 1
-                notchOpacity: root.notchOpacity
-                filletRadius: root.notchEarRadius
-                bottomRadius: root.sideNotchBottomRadius
-                height: root.notchHeight
-                implicitHeight: root.notchHeight
-                attachedBottom: root.mainBarEdge === "bottom"
-                hasAttachedPopup: false
-                y: root.mainBarEdge === "bottom" ? (notchBarWindow.height - height) : 0
-                anchors.right: parent.right
-                leftFillet: true
-                rightFillet: false
-                onOpenMixer: root.openMixer()
-                onCloseMixer: mixerLeaveTimer.restart()
-                onToggleMixer: root.toggleMixer()
-                onOpenBrightness: root.openBrightness()
-                onCloseBrightness: brightnessLeaveTimer.restart()
-                onToggleBrightness: root.toggleBrightness()
-                onOpenBattery: root.openBattery()
-                onCloseBattery: batteryLeaveTimer.restart()
-                onToggleBattery: root.toggleBattery()
-                onOpenTray: root.openTray()
-                onCloseTray: trayLeaveTimer.restart()
-                onToggleTray: root.toggleTray()
-                onOpenWifi: root.openWifi()
-                onToggleWifi: root.toggleWifi()
-                onOpenPower: root.openPower()
+                NotchBarCenter {
+                    id: notchCenterItem
+                    z: root.centerDashboardOpen ? 100 : 1
+                    notchOpacity: root.notchOpacity
+                    filletRadius: root.notchEarRadius
+                    bottomRadius: root.centerDashboardOpen ? 20 : root.notchBottomRadius
+                    isExpanded: root.centerDashboardOpen
+                    visible: root.musicBarEdge === root.mainBarEdge
+                    barContent: root.musicBarContent
+                    showVinylDisc: root.showVinylDisc
+                    showEqualizer: root.showEqualizer
+                    attachedBottom: root.mainBarEdge === "bottom"
+                    hasAttachedPopup: (root.calendarOpen || root.smallMusicOpen) && !root.centerDashboardOpen
+                    height: isExpanded ? (notchCenterItem.dashImplicitHeight || 270) : ((notchCenterItem.dragActive || notchCenterItem.isUploading) ? Math.round(48 * root.shellScale) : root.notchHeight)
+                    implicitHeight: isExpanded ? (notchCenterItem.dashImplicitHeight || 270) : ((notchCenterItem.dragActive || notchCenterItem.isUploading) ? Math.round(48 * root.shellScale) : root.notchHeight)
+                    y: root.mainBarEdge === "bottom" ? (notchBarWindow.height - height) : 0
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    leftFillet: true
+                    rightFillet: true
+                    onToggleCenterDashboard: root.toggleCenterDashboard()
+                    onCloseCenterDashboard: root.closeCenterDashboard()
+                    onToggleMusic: root.toggleCenterDashboard()
+                    onOpenMusic: root.openCenterDashboard()
+                    onToggleControls: root.toggleCenterDashboard()
+                    onOpenSpatialCanvasNode: (gx, gy) => root.openSpatialCanvasNode(gx, gy)
+                    onOpenNotifications: root.openSpatialCanvasNode(0, 1)
+                    Component.onCompleted: root.notchCenterItem = notchCenterItem
+                }
+
+                NotchBarRight {
+                    id: notchRightItem
+                    z: 1
+                    notchOpacity: root.notchOpacity
+                    filletRadius: root.notchEarRadius
+                    bottomRadius: root.sideNotchBottomRadius
+                    height: root.notchHeight
+                    implicitHeight: root.notchHeight
+                    attachedBottom: root.mainBarEdge === "bottom"
+                    hasAttachedPopup: false
+                    y: root.mainBarEdge === "bottom" ? (notchBarWindow.height - height) : 0
+                    anchors.right: parent.right
+                    leftFillet: true
+                    rightFillet: false
+                    onOpenMixer: root.openMixer()
+                    onCloseMixer: mixerLeaveTimer.restart()
+                    onToggleMixer: root.toggleMixer()
+                    onOpenBrightness: root.openBrightness()
+                    onCloseBrightness: brightnessLeaveTimer.restart()
+                    onToggleBrightness: root.toggleBrightness()
+                    onOpenBattery: root.openBattery()
+                    onCloseBattery: batteryLeaveTimer.restart()
+                    onToggleBattery: root.toggleBattery()
+                    onOpenTray: root.openTray()
+                    onCloseTray: trayLeaveTimer.restart()
+                    onToggleTray: root.toggleTray()
+                    onOpenWifi: root.openWifi()
+                    onToggleWifi: root.toggleWifi()
+                    onOpenPower: root.openPower()
+                }
             }
         }
     }
@@ -5091,10 +5114,9 @@ ShellRoot {
     }
 
 
-    /* Quick-settings panel: now-playing strip over the quick toggles, positioned
-     * dynamically according to root.controlsCorner ("bottom_right", "top_left", or "bottom_left"). */
+    /* Quick-settings panel: DECOMMISSIONED - folded into Center Notch Settings Mode (notchPage == -1) */
     Variants {
-        model: Quickshell.screens.length > 0 ? [Quickshell.screens[0]] : []
+        model: []
 
         PanelWindow {
             id: controlsWindow
@@ -5169,9 +5191,9 @@ ShellRoot {
         }
     }
 
-    /* Hot Corner Trigger for ControlHub (Top-Right when bar on bottom, Bottom-Right when bar on top) */
+    /* Hot Corner Trigger for ControlHub - DECOMMISSIONED */
     Variants {
-        model: Quickshell.screens
+        model: []
 
         PanelWindow {
             id: controlHubTriggerWindow

@@ -95,6 +95,7 @@ PanelWindow {
     property real rootOpacity: 0.0
 
     onIsOpenChanged: {
+        GlobalState.isCommandCenterOpen = isOpen || animatingOut
         if (!isOpen) {
             rootOpacity = 0.0
             animatingOut = true
@@ -102,12 +103,12 @@ PanelWindow {
             activeGridX = 0
             activeGridY = 0
             isOverview = true
-            viewport.zoomScale = 0.31
+            viewport.zoomScale = 0.33
         } else {
             animatingOut = false
             closeAnimTimer.stop()
             rootOpacity = 1.0
-            viewport.zoomScale = isOverview ? 0.31 : 1.0
+            viewport.zoomScale = isOverview ? 0.33 : 1.0
             spatialCanvasWindow.refreshBrowserFiles()
             spatialCanvasWindow.refreshWallpapers()
             spatialCanvasWindow.refreshBluetooth()
@@ -140,7 +141,7 @@ PanelWindow {
         interval: 16
         onTriggered: {
             if (spatialCanvasWindow.isOverview) {
-                viewport.zoomScale = 0.31
+                viewport.zoomScale = 0.33
             }
         }
     }
@@ -829,7 +830,7 @@ PanelWindow {
 
     onIsOverviewChanged: {
         if (!entranceTimer.running) {
-            viewport.zoomScale = isOverview ? 0.31 : 1.0;
+            viewport.zoomScale = isOverview ? 0.33 : 1.0;
         }
     }
 
@@ -844,7 +845,7 @@ PanelWindow {
     function zoomToOverview() {
         entranceTimer.stop();
         isOverview = true;
-        viewport.zoomScale = 0.31;
+        viewport.zoomScale = 0.33;
     }
 
     function toggleNodeZoom(gx, gy) {
@@ -956,11 +957,11 @@ PanelWindow {
             property alias activeX: spatialCanvasWindow.activeGridX
             property alias activeY: spatialCanvasWindow.activeGridY
             property alias isOverview: spatialCanvasWindow.isOverview
-            property real zoomScale: 0.31
+            property real zoomScale: isOverview ? 0.33 : 1.0
 
-            readonly property real stepX: Math.round(width * 0.78)
-            readonly property real stepY: Math.round(height * 0.78)
-            readonly property real cardWidth: Math.round(width * 0.70)
+            readonly property real stepX: Math.round(width * 0.88)
+            readonly property real stepY: Math.round(height * 0.96)
+            readonly property real cardWidth: Math.round(width * 0.72)
             readonly property real cardHeight: Math.round(height * 0.70)
 
             MouseArea {
@@ -1124,19 +1125,22 @@ PanelWindow {
                                                 readonly property bool hasWindows: modelData.windows && modelData.windows.length > 0
                                                 readonly property bool isHovered: wsMouseArea.containsMouse
 
-                                                color: isActive
-                                                    ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.14)
+                                                opacity: (!hasWindows && !isActive && !isHovered) ? 0.38 : 1.0
+                                                Behavior on opacity { NumberAnimation { duration: 160 } }
+
+                                                color: (isActive || hasWindows)
+                                                    ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.12)
                                                     : (isHovered
                                                         ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08)
-                                                        : (hasWindows ? Qt.rgba(22/255, 25/255, 34/255, 0.88) : Qt.rgba(14/255, 16/255, 23/255, 0.55)))
+                                                        : Qt.rgba(14/255, 16/255, 23/255, 0.55))
 
-                                                border.color: isActive
+                                                border.color: (isActive || hasWindows)
                                                     ? Theme.primary
                                                     : (isHovered
                                                         ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.65)
-                                                        : (hasWindows ? Qt.rgba(255, 255, 255, 0.15) : Qt.rgba(255, 255, 255, 0.07)))
+                                                        : Qt.rgba(1, 1, 1, 0.05))
 
-                                                border.width: isActive ? 1.5 : (isHovered ? 1.2 : 1)
+                                                border.width: isActive ? 1.5 : (hasWindows ? 1.2 : 1.0)
 
                                                 Behavior on color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
                                                 Behavior on border.color { ColorAnimation { duration: 160; easing.type: Easing.OutCubic } }
@@ -1268,9 +1272,9 @@ PanelWindow {
 
                                                             x: Math.round(normX * (miniArea.width - width))
                                                             y: Math.round(normY * (miniArea.height - height))
-                                                            width: Math.max(Theme.px(22), Math.min(miniArea.width * 0.92, Math.round(normW * miniArea.width)))
-                                                            height: Math.max(Theme.px(16), Math.min(miniArea.height * 0.92, Math.round(normH * miniArea.height)))
-                                                            radius: Theme.px(4)
+                                                            width: Math.max(Theme.px(36), Math.min(miniArea.width * 0.92, Math.round(normW * miniArea.width)))
+                                                            height: Math.max(Theme.px(36), Math.min(miniArea.height * 0.92, Math.round(normH * miniArea.height)))
+                                                            radius: Theme.px(6)
 
                                                             color: modelData.is_focused
                                                                 ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.32)
@@ -1290,10 +1294,10 @@ PanelWindow {
 
                                                             Image {
                                                                 anchors.centerIn: parent
-                                                                width: Math.min(parent.width - Theme.px(4), Theme.px(13))
-                                                                height: Math.min(parent.height - Theme.px(4), Theme.px(13))
+                                                                width: Math.min(parent.width - Theme.px(4), Theme.px(32))
+                                                                height: Math.min(parent.height - Theme.px(4), Theme.px(32))
                                                                 source: spatialCanvasWindow.resolveAppIcon(modelData.class)
-                                                                sourceSize: Qt.size(20, 20)
+                                                                sourceSize: Qt.size(32, 32)
                                                                 fillMode: Image.PreserveAspectFit
                                                             }
                                                         }
