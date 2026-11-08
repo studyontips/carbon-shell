@@ -65,6 +65,9 @@ case "$ACTION" in
     focus-alerts)
         sh "$IPC_SCRIPT" "nucleus focus alerts"
         ;;
+    quick-toggles)
+        sh "$IPC_SCRIPT" "nucleus focus connect"
+        ;;
     *)
         exit 0
         ;;

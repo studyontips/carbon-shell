@@ -155,7 +155,6 @@ PanelWindow {
         function onIslandHeightChanged() { root.reloadExtraConfig(); }
         function onIslandTopMarginChanged() { root.reloadExtraConfig(); }
         function onClockFormatChanged() { root.reloadExtraConfig(); }
-        function onDefaultWallpaperPathChanged() { root.reloadExtraConfig(); }
         function onWallpaperPathChanged() { root.reloadExtraConfig(); }
     }
 

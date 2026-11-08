@@ -311,6 +311,9 @@ def apply_hyprland_layer_blur(enable: bool):
                 f.write("# blur disabled\n")
     except Exception as e:
         print(f"Error updating layer blur: {e}", file=sys.stderr)
+    lua_bool = "true" if enable else "false"
+    lua_cmd = f'hl.layer_rule({{ name = "blur-tide-island", match = {{ namespace = "tide-island" }}, blur = {lua_bool}, ignore_alpha = 0.05 }}); hl.layer_rule({{ name = "blur-quickshell", match = {{ namespace = "quickshell" }}, blur = {lua_bool}, ignore_alpha = 0.05 }})'
+    subprocess.run(["hyprctl", "eval", lua_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def is_layer_blur_enabled():
     try:
@@ -2165,20 +2168,47 @@ class ConfigEditorWindow(Adw.ApplicationWindow):
             self.tide_config["shellBlurEnabled"] = act
             self.bar_pos["minimalBlur"] = act
             self.pending_layer_blur = act
+            write_json(TIDE_USERCONFIG_PATH, self.tide_config)
+            hypr_tide = os.path.expanduser("~/.config/hypr/tide-island-userconfig.json")
+            if hypr_tide != TIDE_USERCONFIG_PATH:
+                write_json(hypr_tide, self.tide_config)
+            lua_bool = "true" if act else "false"
+            bls = int(self.tide_config.get("shellBlurSize", 5))
+            blp = int(self.tide_config.get("shellBlurPasses", 2))
+            lua_cmd = f'hl.config({{ decoration = {{ blur = {{ enabled = {lua_bool}, size = {bls}, passes = {blp} }} }} }}); hl.layer_rule({{ name = "blur-tide-island", match = {{ namespace = "tide-island" }}, blur = {lua_bool}, ignore_alpha = 0.05 }}); hl.layer_rule({{ name = "blur-quickshell", match = {{ namespace = "quickshell" }}, blur = {lua_bool}, ignore_alpha = 0.05 }})'
+            subprocess.run(["hyprctl", "eval", lua_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             self.mark_dirty()
         self.add_switch_row(card_minimal, "Frosted Glass Blur", "Enable backdrop blur behind the minimal island", cur_isl_blur, on_isl_blur_toggle)
 
-        cur_isl_bls = int(self.tide_config.get("shellBlurSize", 3))
+        cur_isl_bls = int(self.tide_config.get("shellBlurSize", 5))
         def on_isl_bls_changed(v):
             self.tide_config["shellBlurSize"] = int(v)
             self.looknfeel_cfg["blur_size"] = int(v)
+            write_json(TIDE_USERCONFIG_PATH, self.tide_config)
+            hypr_tide = os.path.expanduser("~/.config/hypr/tide-island-userconfig.json")
+            if hypr_tide != TIDE_USERCONFIG_PATH:
+                write_json(hypr_tide, self.tide_config)
+            act = bool(self.tide_config.get("shellBlurEnabled", True))
+            lua_bool = "true" if act else "false"
+            blp = int(self.tide_config.get("shellBlurPasses", 2))
+            lua_cmd = f'hl.config({{ decoration = {{ blur = {{ enabled = {lua_bool}, size = {int(v)}, passes = {blp} }} }} }})'
+            subprocess.run(["hyprctl", "eval", lua_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             self.mark_dirty()
         self.add_slider_row(card_minimal, "Blur Radius Size", "Backdrop blur radius", 1, 16, 1, cur_isl_bls, "px", on_isl_bls_changed)
 
-        cur_isl_blp = int(self.tide_config.get("shellBlurPasses", 1))
+        cur_isl_blp = int(self.tide_config.get("shellBlurPasses", 2))
         def on_isl_blp_changed(v):
             self.tide_config["shellBlurPasses"] = int(v)
             self.looknfeel_cfg["blur_passes"] = int(v)
+            write_json(TIDE_USERCONFIG_PATH, self.tide_config)
+            hypr_tide = os.path.expanduser("~/.config/hypr/tide-island-userconfig.json")
+            if hypr_tide != TIDE_USERCONFIG_PATH:
+                write_json(hypr_tide, self.tide_config)
+            act = bool(self.tide_config.get("shellBlurEnabled", True))
+            lua_bool = "true" if act else "false"
+            bls = int(self.tide_config.get("shellBlurSize", 5))
+            lua_cmd = f'hl.config({{ decoration = {{ blur = {{ enabled = {lua_bool}, size = {bls}, passes = {int(v)} }} }} }})'
+            subprocess.run(["hyprctl", "eval", lua_cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             self.mark_dirty()
         self.add_slider_row(card_minimal, "Blur Passes", "Sampling passes (1 = ultra-fast / low lag)", 1, 4, 1, cur_isl_blp, "passes", on_isl_blp_changed)
 

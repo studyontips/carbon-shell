@@ -246,7 +246,7 @@ env = PATH,\$HOME/.local/bin:\$PATH
 source = ~/.config/carbon/colors.conf
 source = ~/.config/carbon/windowrules.conf
 source = ~/.config/carbon/$KB_FILE
-source = ~/.config/carbon/configs/vanish-keybinds.conf
+source = ~/.config/hypr/configs/current-mode-keybinds.conf
 
 cursor {
     no_warps = true

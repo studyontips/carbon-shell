@@ -287,7 +287,7 @@ class InstallerWindow(Adw.ApplicationWindow):
 
         header = Gtk.Label(label="Select Initial Shell Mode", xalign=0)
         header.add_css_class("title-2")
-        desc = Gtk.Label(label="You can seamlessly switch modes anytime via Super+C in Carbon Settings.", xalign=0)
+        desc = Gtk.Label(label="You can seamlessly switch modes anytime via Super+, in Carbon Settings.", xalign=0)
         desc.add_css_class("dim-label")
         box.append(header)
         box.append(desc)
@@ -296,7 +296,6 @@ class InstallerWindow(Adw.ApplicationWindow):
         modes = [
             ("minimal_notch", "Minimal Island (Tide)", "Dynamic top island notch with clock, media, and status controls"),
             ("notch", "Carbon Notch", "Centered dynamic island with integrated workspace and dashboard triggers"),
-            ("pill", "Pill Bar", "Floating horizontal pill with system tray and media integration"),
             ("vanish", "Vanish Hub", "Edge-hidden satellite launcher that appears on demand"),
         ]
 
@@ -513,7 +512,7 @@ env = PATH,$HOME/.local/bin:$PATH
 source = ~/.config/carbon/colors.conf
 source = ~/.config/carbon/windowrules.conf
 source = ~/.config/carbon/{kb_target}
-source = ~/.config/carbon/configs/vanish-keybinds.conf
+source = ~/.config/hypr/configs/current-mode-keybinds.conf
 
 cursor {{
     no_warps = true

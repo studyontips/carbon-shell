@@ -34,8 +34,8 @@
     "desc": "Open Carbon Wallpaper Picker",
     "category": "Primary Triggers",
     "mods": "$mainMod",
-    "key": "W",
-    "display_str": "SUPER + W",
+    "key": "N",
+    "display_str": "SUPER + N",
     "action": "wallpaper",
     "icon": "preferences-desktop-wallpaper-symbolic"
   },
@@ -43,9 +43,9 @@
     "title": "Focus Alerts Lobe",
     "desc": "Directly bloom System Alerts & Notifications satellite",
     "category": "Orbital Satellites",
-    "mods": "$mainMod",
-    "key": "A",
-    "display_str": "SUPER + A",
+    "mods": "",
+    "key": "",
+    "display_str": "Unset",
     "action": "focus-alerts",
     "icon": "preferences-system-notifications-symbolic"
   },

@@ -407,40 +407,6 @@ PanelWindow {
                                     }
                                 }
 
-                                // Mode 3: Pill Mode
-                                GlowCard {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-                                    selected: rootWindow.selectedMode === "pill"
-                                    glowColor: "#a855f7"
-                                    onClicked: rootWindow.selectedMode = "pill"
-
-                                    ColumnLayout {
-                                        anchors.fill: parent
-                                        spacing: 8
-
-                                        RowLayout {
-                                            spacing: 10
-                                            Text { text: "󰹍"; font.pixelSize: 22; font.family: "JetBrainsMono Nerd Font"; color: "#a855f7" }
-                                            Text { text: "Pill Capsule"; font.pixelSize: 16; font.weight: Font.Bold; font.family: "JetBrainsMono Nerd Font"; color: "#ffffff" }
-                                            Item { Layout.fillWidth: true }
-                                            Rectangle {
-                                                width: 60; height: 20; radius: 10
-                                                color: rootWindow.selectedMode === "pill" ? "#a855f7" : "#20ffffff"
-                                                Text { anchors.centerIn: parent; text: rootWindow.selectedMode === "pill" ? "ACTIVE" : "SELECT"; font.pixelSize: 10; font.weight: Font.Bold; color: "#ffffff" }
-                                            }
-                                        }
-
-                                        Text {
-                                            text: "Floating rounded capsule island with smooth expanding lobes, quick controls, and integrated workspace switcher."
-                                            font.pixelSize: 12
-                                            font.family: "JetBrainsMono Nerd Font"
-                                            color: "#94a3b8"
-                                            wrapMode: Text.WordWrap
-                                            Layout.fillWidth: true
-                                        }
-                                    }
-                                }
 
                                 // Mode 4: Minimal Island
                                 GlowCard {

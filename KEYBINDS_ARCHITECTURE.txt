@@ -1,0 +1,166 @@
+================================================================================
+CARBON SHELL — KEYBINDINGS ARCHITECTURE & SPECIFICATION
+================================================================================
+
+1. OVERVIEW & PROBLEM STATEMENT
+--------------------------------------------------------------------------------
+In Hyprland (especially when using the native Lua API introduced in 0.57.0+),
+registering duplicate key combinations does NOT overwrite previous bindings;
+it appends them. When duplicate bindings exist across configuration files,
+pressing a single shortcut causes BOTH actions to execute simultaneously.
+
+Previously, this resulted in severe collisions:
+- SUPER+R launched both Spotlight and the Tide Application Launcher.
+- SUPER+B triggered both the Controls panel and Center Dashboard / Capsule toggle.
+- SUPER+W and SUPER+A in Vanish mode collided with window movement (WASD).
+- Arrow keys triggered window movefocus and island swipe simultaneously.
+- SUPER+C launched both the Python Config Editor and Hyprpicker.
+
+This architecture enforces strict domain separation:
+1. COMMON BINDINGS: Exclusively handle compositor, window management, workspace,
+   hardware, and global utilities. NO shell feature keys are bound here.
+2. MODE BINDINGS: Injected dynamically per mode via `carbon-mode-keybinds.sh`
+   (`current-mode-keybinds.conf` and `current-mode-keybinds.lua`).
+3. DEDICATED WINDOW NAVIGATION:
+   - Window Focus: SUPER + Arrow Keys (unified across ALL modes).
+   - Window Movement: SUPER + W / A / S / D (unified across ALL modes).
+   - Window Resize: SUPER + SHIFT + Arrow Keys.
+   - Workspaces: SUPER + 1..0 and SUPER + SHIFT + 1..0.
+4. REMOVAL OF PILL MODE:
+   Pill mode was decommissioned to streamline the desktop shell into three
+   distinct and purpose-built modes: Minimal Island (Tide), Carbon Notch,
+   and Vanish Hub (Nucleus).
+
+
+================================================================================
+2. COMMON KEYBINDINGS (UNIVERSAL ACROSS ALL MODES)
+================================================================================
+Defined in: ~/.config/hypr/carbon/keybinds.conf -> keybinds.lua
+            ~/.config/carbon/configs/keybinds-common.conf
+
+--- Applications & Compositor ---
+SUPER + Return              Open Terminal (kitty)
+SUPER + SHIFT + Return      Open Floating Terminal (kitty 800x550)
+SUPER + Q                   Close active window (killactive)
+ALT + F4                    Close active window (killactive)
+SUPER + SHIFT + Q           Force-kill active process (KillActiveProcess.sh)
+CTRL + ALT + Delete         Exit Hyprland compositor
+SUPER + E                   File Manager (nautilus)
+SUPER + Space               Toggle floating window
+SUPER + F                   Toggle fullscreen
+SUPER + SHIFT + R           Reload Hyprland live
+SUPER + SHIFT + S           Interactive Region Screenshot (hyprshot)
+SUPER + SHIFT + F           Focus HUD & ambient focus audio (carbon-focus)
+
+--- Carbon Settings & Tools ---
+SUPER + comma (SUPER + ,)   Normal Python Carbon Config Editor
+SUPER + SHIFT + comma       Rust Carbon Settings Hub (carbon-settings-hub)
+SUPER + SHIFT + C           Color Picker (hyprpicker -a)
+SUPER + T                   Pomodoro Focus Timer (carbon-pomodoro)
+SUPER + L                   Lock Screen (hyprlock with Carbon ornament)
+SUPER + V                   Clipboard Manager (cliphist + rofi)
+SUPER + SHIFT + D           Carbon Drop File Uploader
+
+--- Window Navigation & Movement ---
+SUPER + Left                Move window focus Left  (movefocus l)
+SUPER + Right               Move window focus Right (movefocus r)
+SUPER + Up                  Move window focus Up    (movefocus u)
+SUPER + Down                Move window focus Down  (movefocus d)
+
+SUPER + W                   Move window Up    (movewindow u)
+SUPER + A                   Move window Left  (movewindow l)
+SUPER + S                   Move window Down  (movewindow d)
+SUPER + D                   Move window Right (movewindow r)
+
+SUPER + SHIFT + Left        Resize window active -50px horizontal
+SUPER + SHIFT + Right       Resize window active +50px horizontal
+SUPER + SHIFT + Up          Resize window active -50px vertical
+SUPER + SHIFT + Down        Resize window active +50px vertical
+
+--- Workspaces ---
+SUPER + 1..0                Switch to workspace 1 through 10
+SUPER + SHIFT + 1..0        Move active window to workspace 1 through 10
+SUPER + Mouse Wheel Down    Next workspace (workspace e+1)
+SUPER + Mouse Wheel Up      Previous workspace (workspace e-1)
+SUPER + Left Mouse Click    Drag / move window
+SUPER + Right Mouse Click   Resize window
+
+--- Hardware & Media Keys ---
+XF86AudioRaiseVolume        Volume +5% (with on-screen HUD)
+XF86AudioLowerVolume        Volume -5% (with on-screen HUD)
+XF86AudioMute               Toggle audio mute
+XF86AudioMicMute            Toggle microphone mute
+XF86MonBrightnessUp         Brightness +5% (with on-screen HUD)
+XF86MonBrightnessDown       Brightness -5% (with on-screen HUD)
+XF86AudioNext               Next media track
+XF86AudioPrev               Previous media track
+XF86AudioPlay / Pause       Toggle media playback
+
+
+================================================================================
+3. MODE-SPECIFIC KEYBINDINGS
+================================================================================
+Generated and hot-swapped dynamically by `carbon-mode-keybinds.sh`:
+
+--------------------------------------------------------------------------------
+A. MINIMAL ISLAND / TIDE ISLAND (`minimal`, `minimal_notch`)
+--------------------------------------------------------------------------------
+Keybind                     Action
+--------------------------------------------------------------------------------
+SUPER + R                   Tide Island Application Launcher
+SUPER + SHIFT + E           Tide Control Center
+SUPER + M                   Tide Music Player
+SUPER + N                   Tide Wallpaper Picker
+SUPER + SHIFT + N           Tide Notification Center
+SUPER + SHIFT + P           Tide Power Menu
+SUPER + Tab                 Spatial Overview / Blueprint
+SUPER + B                   Capsule Expand / Collapse Toggle
+SUPER + ALT + Left          Swipe Island Left
+SUPER + ALT + Right         Swipe Island Right
+SUPER + ALT + Down          Show Island Clock
+(Arrows remain dedicated to movefocus)
+
+--------------------------------------------------------------------------------
+B. CARBON NOTCH (`notch`)
+--------------------------------------------------------------------------------
+Keybind                     Action
+--------------------------------------------------------------------------------
+SUPER + B                   Center Notch Dashboard (Calendar, Weather, Notes)
+SUPER + SHIFT + B           Quick Controls Bento (Wi-Fi, Bluetooth, Audio)
+SUPER + R                   Spotlight Command Palette & App Search
+SUPER + K                   Spotlight Command Palette & App Search
+SUPER + Tab                 Spatial Canvas Overview
+SUPER + N                   Carbon Wallpaper Picker
+SUPER + SHIFT + P           Carbon Power Menu
+(Arrows remain dedicated to movefocus)
+
+--------------------------------------------------------------------------------
+C. VANISH HUB / NUCLEUS (`vanish`, `nucleus`)
+--------------------------------------------------------------------------------
+Keybind                     Action
+--------------------------------------------------------------------------------
+SUPER (Tap & Release)       Toggle Central Nucleus Radial Hub & Satellites
+SUPER + R                   Spotlight Command Palette & App Search
+SUPER + K                   Spotlight Command Palette & App Search
+SUPER + M                   Synced Lyrics Morph
+SUPER + N                   Carbon Wallpaper Picker
+SUPER + B                   Quick Toggles Satellite (Wi-Fi, BT, Audio)
+SUPER + Tab                 Spatial Canvas Overview
+(SUPER + W and SUPER + A are completely unassigned to shell features,
+ reserving them exclusively for WASD window movement).
+(Arrows remain dedicated to movefocus)
+
+
+================================================================================
+4. SUMMARY OF CONFLICT RESOLUTIONS
+================================================================================
+- Pill Mode Removed: Decommissioned across configs, UI, and scripts.
+- SUPER + N: Standardized across ALL modes as the Wallpaper trigger.
+- SUPER + SHIFT + C: Standardized across ALL modes as Hyprpicker color picker.
+- SUPER + comma: Python Carbon Config Editor (`carbon-config-editor`).
+- SUPER + SHIFT + comma: Rust Carbon Settings Hub (`carbon-settings-hub`).
+- SUPER + W, A, S, D: Reserved strictly for window movement across all modes.
+  Vanish mode no longer binds W (wallpaper moved to N) or A (alerts unassigned).
+- Arrow Keys: Unified window focus navigation (`movefocus`) in every mode.
+  Minimal island gestures use SUPER + ALT + Arrows to guarantee zero collisions.
+================================================================================

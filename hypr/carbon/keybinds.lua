@@ -2,15 +2,14 @@
 local mainMod = "SUPER"
 local terminal = "kitty"
 local fileManager = "nautilus"
-local homeDir = os.getenv("HOME") or ""
 
 -- 
--- CARBON SHELL — DEDICATED HYPRLAND KEYBINDINGS
+-- CARBON SHELL — DEDICATED HYPRLAND KEYBINDINGS (COMMON)
 -- Location: ~/.config/hypr/carbon/keybinds.conf
 -- 
--- You can freely edit this file! Any changes here are applied whenever you:
--- 1. Press SUPER + SHIFT + R (or run 'hyprctl reload')
--- 2. Use the Carbon Config Editor GUI (SUPER + C or QuickSettings gear icon)
+-- Common compositor controls shared across all desktop modes.
+-- Mode-specific shell controls (Minimal Island, Notch, Vanish) are loaded
+-- dynamically from ~/.config/hypr/current-mode-keybinds.lua
 -- 
 
 local mainMod = "SUPER"
@@ -18,7 +17,7 @@ local terminal = "kitty"
 local fileManager = "nautilus"
 
 -- ==============================================================================
--- APPLICATIONS & WINDOW CONTROL
+-- APPLICATIONS & COMPOSITOR ACTIONS
 -- ==============================================================================
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("kitty"))
 hl.bind(mainMod .. " + " .. "SHIFT" .. " + Return", hl.dsp.exec_cmd("[float; size 800 550] kitty"))
@@ -29,41 +28,48 @@ hl.bind(mainMod .. " + E", hl.dsp.exec_cmd("nautilus"))
 hl.bind(mainMod .. " + Space", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + " .. "SHIFT" .. " + R", hl.dsp.exec_cmd("hyprctl reload"))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen())
-hl.bind(mainMod .. " + " .. "SHIFT" .. " + F", hl.dsp.exec_cmd(homeDir .. "/.config/hypr/scripts/carbon-focus.sh"))
+hl.bind(mainMod .. " + " .. "SHIFT" .. " + F", hl.dsp.exec_cmd("~/.config/carbon/scripts/carbon-focus.sh"))
 hl.bind(mainMod .. " + " .. "SHIFT" .. " + S", hl.dsp.exec_cmd("hyprshot -m region"))
-hl.bind(mainMod .. " + " .. "SHIFT" .. " + Q", hl.dsp.exec_cmd("~/.config/hypr/scripts/KillActiveProcess.sh"))
+hl.bind(mainMod .. " + " .. "SHIFT" .. " + Q", hl.dsp.exec_cmd("~/.config/carbon/scripts/KillActiveProcess.sh"))
 
 -- ==============================================================================
--- CARBON SHELL FEATURES & CONTROLS (COMMON)
--- Mode-specific shell controls (SUPER+C, SUPER+R, SUPER+N, etc.) are loaded
--- dynamically from ~/.config/hypr/current-mode-keybinds.lua
+-- CARBON UTILITIES & SETTINGS
 -- ==============================================================================
--- Carbon Config Editor GUI (Settings)
-hl.bind(mainMod .. " + comma", hl.dsp.exec_cmd(homeDir .. "/.config/hypr/scripts/carbon-config-editor"))
+-- Python Carbon Config Editor GUI
+hl.bind(mainMod .. " + comma", hl.dsp.exec_cmd("~/.config/carbon/scripts/carbon-config-editor"))
 
--- Carbon Pomodoro Timer
-hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/carbon-pomodoro"))
+-- Rust Carbon Settings Hub
+hl.bind(mainMod .. " + " .. "SHIFT" .. " + comma", hl.dsp.exec_cmd("~/.config/carbon/scripts/carbon-settings-hub"))
+
+-- Color Picker (Hyprpicker)
+hl.bind(mainMod .. " + " .. "SHIFT" .. " + C", hl.dsp.exec_cmd("hyprpicker -a"))
+
+-- Pomodoro Timer
+hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("~/.config/carbon/scripts/carbon-pomodoro"))
 
 -- Lock Screen (Hyprlock with Carbon ornament)
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("~/.config/hypr/scripts/hyprlock.sh"))
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("~/.config/carbon/scripts/hyprlock.sh"))
 
 -- Clipboard Manager (Cliphist + Rofi)
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("bash -c 'cliphist list | rofi -dmenu | cliphist decode | wl-copy'"))
 
+-- Carbon Drop (File Uploader)
+hl.bind(mainMod .. " + " .. "SHIFT" .. " + D", hl.dsp.exec_cmd("~/.config/carbon/scripts/carbon-drop.sh"))
+
 -- ==============================================================================
--- NAVIGATION & WINDOW MOVEMENT
+-- WINDOW NAVIGATION & MOVEMENT
 -- ==============================================================================
--- Move focus (Arrow keys)
+-- Move focus (Arrow keys - active in all modes)
 hl.bind(mainMod .. " + left", hl.dsp.exec_cmd("hyprctl dispatch movefocus l"))
 hl.bind(mainMod .. " + right", hl.dsp.exec_cmd("hyprctl dispatch movefocus r"))
 hl.bind(mainMod .. " + up", hl.dsp.exec_cmd("hyprctl dispatch movefocus u"))
 hl.bind(mainMod .. " + down", hl.dsp.exec_cmd("hyprctl dispatch movefocus d"))
 
--- Move windows (WASD - dedicated sole movement keys)
-hl.bind(mainMod .. " + A", hl.dsp.window.move({ direction = "l" }))
-hl.bind(mainMod .. " + D", hl.dsp.window.move({ direction = "r" }))
+-- Move window (WASD - dedicated window movement keys)
 hl.bind(mainMod .. " + W", hl.dsp.window.move({ direction = "u" }))
+hl.bind(mainMod .. " + A", hl.dsp.window.move({ direction = "l" }))
 hl.bind(mainMod .. " + S", hl.dsp.window.move({ direction = "d" }))
+hl.bind(mainMod .. " + D", hl.dsp.window.move({ direction = "r" }))
 
 -- Resize active window (SUPER + SHIFT + Arrow keys)
 hl.bind(mainMod .. " + " .. "SHIFT" .. " + left", hl.dsp.exec_cmd("hyprctl dispatch resizeactive -50 0"), { repeating = true })
@@ -109,10 +115,9 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 -- ==============================================================================
 -- HARDWARE & MEDIA KEYS
 -- ==============================================================================
-local homeDir = os.getenv("HOME") or ""
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd(homeDir .. "/.config/hypr/scripts/volume.sh --inc"), { repeating = true, locked = true })
-hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd(homeDir .. "/.config/hypr/scripts/volume.sh --dec"), { repeating = true, locked = true })
-hl.bind("XF86AudioMute", hl.dsp.exec_cmd(homeDir .. "/.config/hypr/scripts/volume.sh --toggle"), { repeating = true, locked = true })
+hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("~/.config/carbon/scripts/volume.sh --inc"), { repeating = true, locked = true })
+hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("~/.config/carbon/scripts/volume.sh --dec"), { repeating = true, locked = true })
+hl.bind("XF86AudioMute", hl.dsp.exec_cmd("~/.config/carbon/scripts/volume.sh --toggle"), { repeating = true, locked = true })
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), { repeating = true, locked = true })
 hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl set +5%"), { repeating = true, locked = true })
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"), { repeating = true, locked = true })
